@@ -1,7 +1,8 @@
 const API_BASE = 'https://valorant-api.com/v1';
 
-// ---- Buscador de jugadores (Ruta interna mediante Proxy Serverless) ----
-const PROXY_BASE = '/api/player';
+// ---- Buscador de jugadores (HenrikDev API) ----
+const HENRIK_API_KEY = 'HDEV-4e173a2c-d356-4427-b3da-9d3b84fcf466';
+const HENRIK_BASE = 'https://api.henrikdev.xyz/valorant';
 const VALORANT_REGIONS = [
   { value: 'eu', label: 'Europa' },
   { value: 'na', label: 'Norteamérica' },
@@ -40,7 +41,7 @@ const compareCountText = document.getElementById('compareCountText');
 const openCompareBtn = document.getElementById('openCompareBtn');
 const clearCompareBtn = document.getElementById('clearCompareBtn');
 
-// Pausar y cortar audios/vídeos al cerrar modales
+// CORRECCIÓN CRÍTICA: Pausar y cortar audios/vídeos al cerrar modales
 function stopAllMedia(container) {
   if (!container) return;
   const videos = container.querySelectorAll('video');
@@ -644,7 +645,7 @@ function renderCompareColumn(weapon) {
   `;
 }
 
-// ============ BUSCADOR DE JUGADORES (PROXY SERVERLESS) ============
+// ============ BUSCADOR DE JUGADORES (HENRIKDEV API) ============
 
 function setCatalogControlsVisible(visible) {
   const display = visible ? '' : 'none';
@@ -685,9 +686,14 @@ async function fetchPlayerData() {
 
   contentGrid.innerHTML = `<div class="player-empty-state"><p>Buscando datos avanzados de <strong>${name}#${tag}</strong>...</p></div>`;
 
+  const requestHeaders = {
+    'Authorization': HENRIK_API_KEY,
+    'Accept': 'application/json'
+  };
+
   try {
-    // 1. Consulta la cuenta mediante el Proxy seguro
-    const accountRes = await fetch(`${PROXY_BASE}?type=account&name=${encodeURIComponent(name)}&tag=${encodeURIComponent(tag)}`);
+    const accountUrl = `${HENRIK_BASE}/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+    const accountRes = await fetch(accountUrl, { headers: requestHeaders });
     const accountData = await accountRes.json();
 
     if (!accountRes.ok || !accountData.data) {
@@ -696,11 +702,10 @@ async function fetchPlayerData() {
 
     const player = accountData.data;
 
-    // 2. Consulta MMR y Partidas en paralelo mediante el Proxy seguro
-    const mmrPromise = fetch(`${PROXY_BASE}?type=mmr&region=${region}&puuid=${player.puuid}`)
+    const mmrPromise = fetch(`${HENRIK_BASE}/v2/by-puuid/mmr/${region}/${player.puuid}`, { headers: requestHeaders })
       .then(r => r.json()).catch(() => null);
 
-    const matchesPromise = fetch(`${PROXY_BASE}?type=matches&region=${region}&puuid=${player.puuid}`)
+    const matchesPromise = fetch(`${HENRIK_BASE}/v3/by-puuid/matches/${region}/${player.puuid}?size=5`, { headers: requestHeaders })
       .then(r => r.json()).catch(() => null);
 
     const [mmrData, matchesData] = await Promise.all([mmrPromise, matchesPromise]);
