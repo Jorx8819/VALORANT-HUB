@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Valorant Database & Player Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Header y Navegación Principal -->
+  <header class="top-bar">
+    <div class="logo-container">
+      <h1>VALORANT <span>HUB</span></h1>
+    </div>
+
+    <div class="controls-container">
+      <select id="categorySelect" class="styled-select">
+        <option value="agents">Agentes</option>
+        <option value="playercards">Tarjetas de Jugador</option>
+        <option value="weapons">Armas</option>
+        <option value="sprays">Graffitis</option>
+        <option value="buddies">Llaveros</option>
+        <option value="maps">Mapas</option>
+      </select>
+
+      <select id="langSelect" class="styled-select">
+        <option value="es-ES">Español (España)</option>
+        <option value="es-MX">Español (México)</option>
+        <option value="en-US">English (US)</option>
+        <option value="de-DE">Deutsch</option>
+        <option value="fr-FR">Français</option>
+        <option value="it-IT">Italiano</option>
+        <option value="ja-JP">日本語</option>
+        <option value="ko-KR">한국어</option>
+        <option value="pl-PL">Polski</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="ru-RU">Русский</option>
+        <option value="tr-TR">Türkçe</option>
+        <option value="zh-CN">中文 (简体)</option>
+        <option value="zh-TW">中文 (繁體)</option>
+        <option value="ar-AE">العربية</option>
+        <option value="id-ID">Bahasa Indonesia</option>
+        <option value="th-TH">ไทย</option>
+        <option value="vi-VN">Tiếng Việt</option>
+      </select>
+
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Buscar por nombre..." />
+      </div>
+
+      <button id="favFilterBtn" class="action-icon-btn" title="Ver Favoritos">♥</button>
+      <button id="playerSearchToggleBtn" class="action-icon-btn" title="Buscar Jugador">🔍 Jugadores</button>
+    </div>
+  </header>
+
+  <!-- Sub-bar para Filtros de Categoría y Buscador de Jugadores -->
+  <div id="subFilterBar" class="sub-filter-bar"></div>
+
+  <!-- Grilla de Contenido Principal -->
+  <main class="main-content">
+    <div id="contentGrid" class="content-grid"></div>
+  </main>
+
+  <!-- Comparador Flotante (Solo Armas) -->
+  <div id="compareFloatingBar" class="compare-floating-bar" style="display: none;">
+    <span id="compareCountText">0/2 armas seleccionadas</span>
+    <button id="openCompareBtn" disabled>Comparar</button>
+    <button id="clearCompareBtn" class="secondary">Limpiar</button>
+  </div>
+
+  <!-- Modal Detalle Principal -->
+  <div id="detailModal" class="modal">
+    <div class="modal-content">
+      <span id="closeModal" class="close-btn">&times;</span>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- Modal Comparador -->
+  <div id="compareModal" class="modal">
+    <div class="modal-content large">
+      <span id="closeCompareModal" class="close-btn">&times;</span>
+      <div id="compareModalBody"></div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
