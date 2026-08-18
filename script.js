@@ -1,8 +1,12 @@
 const API_BASE = 'https://valorant-api.com/v1';
 
-// ---- Buscador de jugadores (HenrikDev API) ----
-const HENRIK_API_KEY = 'HDEV-4e173a2c-d356-4427-b3da-9d3b84fcf466';
-const HENRIK_BASE = 'https://api.henrikdev.xyz/valorant';
+// ---- Buscador de jugadores y Favoritos (Rutas internas mediante Proxy Serverless) ----
+const PROXY_BASE = '/api/player';
+const FAVORITES_API = '/api/favorites';
+
+// ID de usuario temporal o simulado para la prueba (en un sistema de login real se obtendría del usuario autenticado)
+let currentUserId = 'usuario_demo_123';
+
 const VALORANT_REGIONS = [
   { value: 'eu', label: 'Europa' },
   { value: 'na', label: 'Norteamérica' },
@@ -14,7 +18,7 @@ const VALORANT_REGIONS = [
 
 // Estado global
 let currentData = [];
-let favorites = JSON.parse(localStorage.getItem('valorant_favs')) || [];
+let favorites = []; // Ahora vendrán de Supabase
 let compareList = [];
 let showingFavsOnly = false;
 let viewMode = 'catalog'; // 'catalog' | 'player'
@@ -41,7 +45,7 @@ const compareCountText = document.getElementById('compareCountText');
 const openCompareBtn = document.getElementById('openCompareBtn');
 const clearCompareBtn = document.getElementById('clearCompareBtn');
 
-// CORRECCIÓN CRÍTICA: Pausar y cortar audios/vídeos al cerrar modales
+// Pausar y cortar audios/vídeos al cerrar modales
 function stopAllMedia(container) {
   if (!container) return;
   const videos = container.querySelectorAll('video');
@@ -71,7 +75,8 @@ function shutdownCompareModal() {
 }
 
 // Event Listeners
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadUserFavorites();
   loadCategoryData();
 
   categorySelect.addEventListener('change', () => {
@@ -119,6 +124,51 @@ document.addEventListener('DOMContentLoaded', () => {
     filterAndRender();
   });
 });
+
+// --- GESTIÓN DE FAVORITOS CON SUPABASE (API/FAVORITES) ---
+async function loadUserFavorites() {
+  try {
+    const response = await fetch(`${FAVORITES_API}?userId=${currentUserId}`);
+    const result = await response.json();
+    if (response.ok && result.favorites) {
+      // Mapeamos los elementos guardados para extraer únicamente los item_uuid
+      favorites = result.favorites.map(fav => fav.item_uuid);
+    }
+  } catch (error) {
+    console.error('Error al cargar favoritos desde Supabase:', error);
+  }
+}
+
+async function toggleFavorite(uuid, event) {
+  event.stopPropagation();
+  const isFav = favorites.includes(uuid);
+  const category = categorySelect.value;
+
+  if (isFav) {
+    // Si ya es favorito, lo quitamos localmente (puedes ampliar tu api para soportar DELETE si lo deseas)
+    favorites = favorites.filter(id => id !== uuid);
+    filterAndRender();
+    // Opcional: Llamada DELETE a tu backend si implementas borrado
+  } else {
+    // Si no es favorito, lo añadimos
+    favorites.push(uuid);
+    filterAndRender();
+
+    try {
+      await fetch(FAVORITES_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUserId,
+          itemUuid: uuid,
+          itemType: category
+        })
+      });
+    } catch (error) {
+      console.error('Error al guardar favorito en Supabase:', error);
+    }
+  }
+}
 
 // Carga de Datos desde API Oficial
 async function loadCategoryData() {
@@ -554,18 +604,6 @@ function filterByRole(role, btn) {
   renderCards(filtered, categorySelect.value);
 }
 
-// Favoritos
-function toggleFavorite(uuid, event) {
-  event.stopPropagation();
-  if (favorites.includes(uuid)) {
-    favorites = favorites.filter(id => id !== uuid);
-  } else {
-    favorites.push(uuid);
-  }
-  localStorage.setItem('valorant_favs', JSON.stringify(favorites));
-  filterAndRender();
-}
-
 // Comparador de Armas
 function toggleCompare(uuid, event) {
   event.stopPropagation();
@@ -645,7 +683,7 @@ function renderCompareColumn(weapon) {
   `;
 }
 
-// ============ BUSCADOR DE JUGADORES (HENRIKDEV API) ============
+// ============ BUSCADOR DE JUGADORES (PROXY SERVERLESS) ============
 
 function setCatalogControlsVisible(visible) {
   const display = visible ? '' : 'none';
@@ -686,14 +724,8 @@ async function fetchPlayerData() {
 
   contentGrid.innerHTML = `<div class="player-empty-state"><p>Buscando datos avanzados de <strong>${name}#${tag}</strong>...</p></div>`;
 
-  const requestHeaders = {
-    'Authorization': HENRIK_API_KEY,
-    'Accept': 'application/json'
-  };
-
   try {
-    const accountUrl = `${HENRIK_BASE}/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
-    const accountRes = await fetch(accountUrl, { headers: requestHeaders });
+    const accountRes = await fetch(`${PROXY_BASE}?type=account&name=${encodeURIComponent(name)}&tag=${encodeURIComponent(tag)}`);
     const accountData = await accountRes.json();
 
     if (!accountRes.ok || !accountData.data) {
@@ -702,10 +734,10 @@ async function fetchPlayerData() {
 
     const player = accountData.data;
 
-    const mmrPromise = fetch(`${HENRIK_BASE}/v2/by-puuid/mmr/${region}/${player.puuid}`, { headers: requestHeaders })
+    const mmrPromise = fetch(`${PROXY_BASE}?type=mmr&region=${region}&puuid=${player.puuid}`)
       .then(r => r.json()).catch(() => null);
 
-    const matchesPromise = fetch(`${HENRIK_BASE}/v3/by-puuid/matches/${region}/${player.puuid}?size=5`, { headers: requestHeaders })
+    const matchesPromise = fetch(`${PROXY_BASE}?type=matches&region=${region}&puuid=${player.puuid}`)
       .then(r => r.json()).catch(() => null);
 
     const [mmrData, matchesData] = await Promise.all([mmrPromise, matchesPromise]);
