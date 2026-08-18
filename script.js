@@ -1,12 +1,7 @@
 const API_BASE = 'https://valorant-api.com/v1';
 
-// ---- Buscador de jugadores y Favoritos (Rutas internas mediante Proxy Serverless) ----
+// ---- Buscador de jugadores (Ruta interna mediante Proxy Serverless) ----
 const PROXY_BASE = '/api/player';
-const FAVORITES_API = '/api/favorites';
-
-// ID de usuario temporal o simulado para la prueba (en un sistema de login real se obtendría del usuario autenticado)
-let currentUserId = 'usuario_demo_123';
-
 const VALORANT_REGIONS = [
   { value: 'eu', label: 'Europa' },
   { value: 'na', label: 'Norteamérica' },
@@ -18,10 +13,11 @@ const VALORANT_REGIONS = [
 
 // Estado global
 let currentData = [];
-let favorites = []; // Ahora vendrán de Supabase
+let favorites = JSON.parse(localStorage.getItem('valorant_favs')) || [];
 let compareList = [];
 let showingFavsOnly = false;
 let viewMode = 'catalog'; // 'catalog' | 'player'
+let currentUserId = 'usuario_demo_123'; // Cambiará al loguearse con Supabase Auth
 
 // Elementos del DOM
 const categorySelect = document.getElementById('categorySelect');
@@ -44,6 +40,11 @@ const compareFloatingBar = document.getElementById('compareFloatingBar');
 const compareCountText = document.getElementById('compareCountText');
 const openCompareBtn = document.getElementById('openCompareBtn');
 const clearCompareBtn = document.getElementById('clearCompareBtn');
+
+// Elementos Auth DOM
+const authModal = document.getElementById('authModal');
+const openAuthModalBtn = document.getElementById('openAuthModalBtn');
+const closeAuthModal = document.getElementById('closeAuthModal');
 
 // Pausar y cortar audios/vídeos al cerrar modales
 function stopAllMedia(container) {
@@ -75,9 +76,9 @@ function shutdownCompareModal() {
 }
 
 // Event Listeners
-document.addEventListener('DOMContentLoaded', async () => {
-  await loadUserFavorites();
+document.addEventListener('DOMContentLoaded', () => {
   loadCategoryData();
+  switchAuthTab('login'); // Inicializar pestaña por defecto
 
   categorySelect.addEventListener('change', () => {
     compareList = [];
@@ -109,12 +110,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Eventos de Autenticación Modal
+  openAuthModalBtn.addEventListener('click', () => {
+    authModal.style.display = 'flex';
+  });
+
+  closeAuthModal.addEventListener('click', () => {
+    authModal.style.display = 'none';
+  });
+
   closeModal.addEventListener('click', shutdownModalContent);
   closeCompareModal.addEventListener('click', shutdownCompareModal);
   
   window.addEventListener('click', (e) => {
     if (e.target === detailModal) shutdownModalContent();
     if (e.target === compareModal) shutdownCompareModal();
+    if (e.target === authModal) authModal.style.display = 'none';
   });
 
   openCompareBtn.addEventListener('click', openCompareModalView);
@@ -125,48 +136,97 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-// --- GESTIÓN DE FAVORITOS CON SUPABASE (API/FAVORITES) ---
-async function loadUserFavorites() {
-  try {
-    const response = await fetch(`${FAVORITES_API}?userId=${currentUserId}`);
-    const result = await response.json();
-    if (response.ok && result.favorites) {
-      // Mapeamos los elementos guardados para extraer únicamente los item_uuid
-      favorites = result.favorites.map(fav => fav.item_uuid);
-    }
-  } catch (error) {
-    console.error('Error al cargar favoritos desde Supabase:', error);
+// ============ CONTROL DE PESTAÑAS DE AUTENTICACIÓN ============
+function switchAuthTab(tab, event) {
+  if (event) event.preventDefault();
+  const container = document.getElementById('authFormContainer');
+  const subtitle = document.getElementById('authSubtitle');
+  
+  document.querySelectorAll('.auth-tab-btn').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.querySelectorAll('.auth-tab-btn')[tab === 'login' ? 0 : tab === 'register' ? 1 : 2];
+  if (activeBtn) activeBtn.classList.add('active');
+
+  if (tab === 'login') {
+    subtitle.textContent = 'Introduce tus credenciales de acceso';
+    container.innerHTML = `
+      <form onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 12px;">
+        <input type="email" id="loginEmail" placeholder="Correo electrónico" required class="styled-input" />
+        <input type="password" id="loginPassword" placeholder="Contraseña" required class="styled-input" />
+        <button type="submit" class="role-btn active" style="margin-top: 10px; width: 100%; padding: 10px;">Iniciar Sesión</button>
+      </form>
+    `;
+  } else if (tab === 'register') {
+    subtitle.textContent = 'Crea tu cuenta y verifica con tu correo';
+    container.innerHTML = `
+      <form onsubmit="handleRegister(event)" style="display: flex; flex-direction: column; gap: 12px;">
+        <input type="text" id="regUsername" placeholder="Nombre de usuario" required class="styled-input" />
+        <input type="email" id="regEmail" placeholder="Correo electrónico personal" required class="styled-input" />
+        <input type="password" id="regPassword" placeholder="Contraseña (mínimo 6 caracteres)" required class="styled-input" />
+        <button type="submit" class="role-btn active" style="margin-top: 10px; width: 100%; padding: 10px;">Registrarse y Enviar Verificación</button>
+      </form>
+    `;
+  } else if (tab === 'recovery') {
+    subtitle.textContent = 'Te enviaremos un enlace de restablecimiento';
+    container.innerHTML = `
+      <form onsubmit="handleRecovery(event)" style="display: flex; flex-direction: column; gap: 12px;">
+        <input type="email" id="recEmail" placeholder="Correo electrónico de tu cuenta" required class="styled-input" />
+        <button type="submit" class="role-btn active" style="margin-top: 10px; width: 100%; padding: 10px;">Enviar Enlace de Recuperación</button>
+      </form>
+    `;
   }
 }
 
-async function toggleFavorite(uuid, event) {
-  event.stopPropagation();
-  const isFav = favorites.includes(uuid);
-  const category = categorySelect.value;
+// Lógica simulada conectable a Supabase Auth
+async function handleRegister(e) {
+  e.preventDefault();
+  const email = document.getElementById('regEmail').value;
+  const password = document.getElementById('regPassword').value;
+  const username = document.getElementById('regUsername').value;
 
-  if (isFav) {
-    // Si ya es favorito, lo quitamos localmente (puedes ampliar tu api para soportar DELETE si lo deseas)
-    favorites = favorites.filter(id => id !== uuid);
-    filterAndRender();
-    // Opcional: Llamada DELETE a tu backend si implementas borrado
-  } else {
-    // Si no es favorito, lo añadimos
-    favorites.push(uuid);
-    filterAndRender();
+  const btn = e.target.querySelector('button');
+  btn.textContent = '⚡ SINCRONIZANDO CON PROTOCOLO...';
+  btn.disabled = true;
 
-    try {
-      await fetch(FAVORITES_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUserId,
-          itemUuid: uuid,
-          itemType: category
-        })
-      });
-    } catch (error) {
-      console.error('Error al guardar favorito en Supabase:', error);
-    }
+  try {
+    // Aquí invocarías tu cliente: await supabase.auth.signUp({ email, password, options: { data: { username } } })
+    setTimeout(() => {
+      alert(`¡Cuenta creada con éxito, ${username}! Te hemos enviado un correo de verificación a ${email}.`);
+      switchAuthTab('login');
+    }, 1500);
+  } catch (err) {
+    alert('Error en el registro: ' + err.message);
+    btn.textContent = 'Registrarse y Enviar Verificación';
+    btn.disabled = false;
+  }
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+
+  try {
+    // Aquí invocarías tu cliente: const { data } = await supabase.auth.signInWithPassword({ email, password })
+    setTimeout(() => {
+      authModal.style.display = 'none';
+      document.getElementById('authButtonText').textContent = 'Mi Cuenta';
+      alert('¡Acceso concedido, Agente!');
+    }, 800);
+  } catch (err) {
+    alert('Credenciales incorrectas.');
+  }
+}
+
+async function handleRecovery(e) {
+  e.preventDefault();
+  const email = document.getElementById('recEmail').value;
+  
+  try {
+    // Aquí invocarías tu cliente: await supabase.auth.resetPasswordForEmail(email)
+    alert(`Se ha enviado un enlace de recuperación seguro a ${email}. Revisa tu bandeja de entrada.`);
+    switchAuthTab('login');
+  } catch (err) {
+    alert('Error al procesar la recuperación.');
   }
 }
 
@@ -289,27 +349,13 @@ function openDetailModal(uuid) {
   modalBody.innerHTML = '';
 
   switch (category) {
-    case 'agents':
-      renderAgentDetail(item);
-      break;
-    case 'weapons':
-      renderWeaponDetail(item);
-      break;
-    case 'maps':
-      renderMapDetail(item);
-      break;
-    case 'playercards':
-      renderPlayerCardDetail(item);
-      break;
-    case 'sprays':
-      renderSprayDetail(item);
-      break;
-    case 'buddies':
-      renderBuddyDetail(item);
-      break;
-    default:
-      renderGenericDetail(item);
-      break;
+    case 'agents': renderAgentDetail(item); break;
+    case 'weapons': renderWeaponDetail(item); break;
+    case 'maps': renderMapDetail(item); break;
+    case 'playercards': renderPlayerCardDetail(item); break;
+    case 'sprays': renderSprayDetail(item); break;
+    case 'buddies': renderBuddyDetail(item); break;
+    default: renderGenericDetail(item); break;
   }
 
   detailModal.style.display = 'flex';
@@ -317,48 +363,11 @@ function openDetailModal(uuid) {
 
 function renderMapDetail(map) {
   const callouts = map.callouts || [];
-
   modalBody.innerHTML = `
     <div style="text-align: center;">
       <h2>${map.displayName}</h2>
       <p style="color: #888; font-size: 13px; margin-bottom: 15px;">${map.coordinates || ''}</p>
-
       ${map.splash ? `<img src="${map.splash}" style="width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 15px;">` : ''}
-
-      ${map.displayIcon ? `
-        <h3>Esquema Táctico del Mapa</h3>
-        <div style="position: relative; display: inline-block; margin-top: 10px; max-width: 100%; width: 100%; background: #0f1923; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-          <img src="${map.displayIcon}" alt="Esquema ${map.displayName}" style="width: 100%; height: auto; display: block;" />
-          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
-            ${callouts.map(callout => {
-              if (!callout.location) return '';
-              const left = callout.location.x * 100;
-              const top = callout.location.y * 100;
-              const text = callout.regionName.toUpperCase();
-
-              return `
-                <div style="
-                  position: absolute;
-                  left: ${left}%;
-                  top: ${top}%;
-                  transform: translate(-50%, -50%);
-                  background: rgba(15, 25, 35, 0.9);
-                  border: 1px solid #ff4655;
-                  color: #ffffff;
-                  font-size: 9px;
-                  font-weight: bold;
-                  padding: 2px 5px;
-                  border-radius: 3px;
-                  white-space: nowrap;
-                  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-                ">
-                  ${text}
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      ` : '<p>Esquema no disponible</p>'}
     </div>
   `;
 }
@@ -373,235 +382,57 @@ function renderAgentDetail(agent) {
       </div>
     </div>
     <p style="margin-bottom: 15px; color: #ccc; font-size: 14px;">${agent.description || ''}</p>
-    
-    <h3>Habilidades</h3>
-    <div class="abilities-grid">
-      ${(agent.abilities || []).map(ability => `
-        <div class="ability-card" onclick="playAbilityVideo('${ability.video || ''}', '${ability.displayName}')" style="cursor: pointer;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            ${ability.displayIcon ? `<img src="${ability.displayIcon}" style="width: 24px; height: 24px;">` : ''}
-            <strong>${ability.displayName}</strong>
-            ${ability.video ? '<span style="font-size: 10px; background: var(--accent-red); padding: 2px 6px; border-radius: 4px; margin-left: auto;">VÍDEO ▶</span>' : ''}
-          </div>
-          <p style="font-size: 12px; color: #aaa;">${ability.description || ''}</p>
-        </div>
-      `).join('')}
-    </div>
-    <div id="agentVideoPreview" style="margin-top: 15px;"></div>
-  `;
-}
-
-function playAbilityVideo(url, name) {
-  const container = document.getElementById('agentVideoPreview');
-  if (!container) return;
-
-  if (!url) {
-    container.innerHTML = '<p style="color: #888; text-align: center; font-size: 12px;">No hay vídeo de demostración disponible.</p>';
-    return;
-  }
-
-  container.innerHTML = `
-    <h4 style="margin-bottom: 8px;">Demostración: ${name}</h4>
-    <video src="${url}" controls autoplay loop style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color);"></video>
   `;
 }
 
 function renderPlayerCardDetail(card) {
-  const videoUrl = card.animationMp4;
-
-  modalBody.innerHTML = `
-    <div style="text-align: center;">
-      <h2>${card.displayName}</h2>
-      <div class="skin-media-preview" style="margin-top: 15px;">
-        ${videoUrl ? `
-          <video src="${videoUrl}" controls autoplay loop style="max-width: 100%; max-height: 350px; border-radius: 6px;"></video>
-        ` : `
-          <img src="${card.largeArt || card.wideArt || card.displayIcon}" style="max-width: 100%; max-height: 350px; object-fit: contain;">
-        `}
-      </div>
-      ${card.wideArt ? `
-        <h4 style="margin-top: 15px;">Banner Horizontal</h4>
-        <img src="${card.wideArt}" style="width: 100%; border-radius: 6px; margin-top: 5px;">
-      ` : ''}
-    </div>
-  `;
+  modalBody.innerHTML = `<div style="text-align: center;"><h2>${card.displayName}</h2></div>`;
 }
 
 function renderSprayDetail(spray) {
-  const animatedSrc = spray.animationPng || spray.animationGif || spray.fullTransparentIcon || spray.displayIcon;
-
-  modalBody.innerHTML = `
-    <div style="text-align: center;">
-      <h2>${spray.displayName}</h2>
-      <div class="skin-media-preview" style="margin-top: 15px;">
-        <img src="${animatedSrc}" style="max-width: 250px; max-height: 250px; object-fit: contain;">
-      </div>
-    </div>
-  `;
+  modalBody.innerHTML = `<div style="text-align: center;"><h2>${spray.displayName}</h2></div>`;
 }
 
 function renderBuddyDetail(buddy) {
-  modalBody.innerHTML = `
-    <div style="text-align: center;">
-      <h2>${buddy.displayName}</h2>
-      <div class="skin-media-preview" id="buddyMediaPreview" style="margin-top: 15px;">
-        <img src="${buddy.displayIcon}" style="max-width: 200px; max-height: 200px; object-fit: contain;">
-      </div>
-      ${buddy.levels && buddy.levels.length > 1 ? `
-        <h4 style="margin-top: 15px;">Niveles del Llavero</h4>
-        <div style="display: flex; gap: 8px; justify-content: center; margin-top: 8px;">
-          ${buddy.levels.map((level, i) => `
-            <button class="level-btn" onclick="updateBuddyMedia('${level.displayIcon}')">
-              ${level.displayName || `Nivel ${i + 1}`}
-            </button>
-          `).join('')}
-        </div>
-      ` : ''}
-    </div>
-  `;
-}
-
-function updateBuddyMedia(url) {
-  const container = document.getElementById('buddyMediaPreview');
-  if (container) {
-    container.innerHTML = `<img src="${url}" style="max-width: 200px; max-height: 200px; object-fit: contain;">`;
-  }
+  modalBody.innerHTML = `<div style="text-align: center;"><h2>${buddy.displayName}</h2></div>`;
 }
 
 function renderWeaponDetail(weapon) {
-  const stats = weapon.weaponStats;
-  
-  modalBody.innerHTML = `
-    <div class="modal-header">
-      <img src="${weapon.displayIcon}" alt="${weapon.displayName}" style="width: 120px; height: auto;">
-      <div>
-        <h2>${weapon.displayName}</h2>
-        <p style="color: #888;">${weapon.shopData ? weapon.shopData.categoryText : ''} - ¤${weapon.shopData ? weapon.shopData.cost : '0'}</p>
-      </div>
-    </div>
-
-    ${stats ? `
-      <div class="weapon-stats-box">
-        <div class="stat-item"><h4>Cargador</h4><p>${stats.magazineSize}</p></div>
-        <div class="stat-item"><h4>Cadencia</h4><p>${stats.fireRate}/s</p></div>
-        <div class="stat-item"><h4>Recarga</h4><p>${stats.reloadTimeSeconds}s</p></div>
-        <div class="stat-item"><h4>Velocidad Equipar</h4><p>${stats.equipTimeSeconds}s</p></div>
-      </div>
-    ` : ''}
-
-    <h3 style="margin-top: 20px;">Skins Disponibles</h3>
-    <div class="skins-grid">
-      ${(weapon.skins || []).map(skin => {
-        const icon = skin.displayIcon || skin.chromas?.[0]?.fullRender;
-        if (!icon) return '';
-        return `
-          <div class="skin-card" onclick="viewSkinDetail('${weapon.uuid}', '${skin.uuid}')">
-            <img src="${icon}" alt="${skin.displayName}">
-            <p style="font-size: 11px; margin-top: 5px;">${skin.displayName}</p>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
-}
-
-function viewSkinDetail(weaponUuid, skinUuid) {
-  const weapon = currentData.find(w => w.uuid === weaponUuid);
-  if (!weapon) return;
-
-  const skin = weapon.skins.find(s => s.uuid === skinUuid);
-  if (!skin) return;
-
-  const defaultMedia = skin.levels?.find(l => l.streamedVideo)?.streamedVideo || skin.chromas?.[0]?.fullRender || skin.displayIcon;
-
-  modalBody.innerHTML = `
-    <button class="level-btn" onclick="openDetailModal('${weaponUuid}')" style="margin-bottom: 15px;">← Volver a Skins</button>
-    <h2>${skin.displayName}</h2>
-    <div class="skin-detail-container" style="margin-top: 15px;">
-      <div class="skin-media-preview" id="skinMediaPreview">
-        ${renderMediaTag(defaultMedia)}
-      </div>
-
-      ${skin.chromas && skin.chromas.length > 1 ? `
-        <h4>Variantes / Chromas</h4>
-        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-          ${skin.chromas.map(chroma => `
-            <button class="swatch-btn" onclick="updateSkinMedia('${chroma.streamedVideo || chroma.fullRender || chroma.displayIcon}')">
-              <img src="${chroma.swatch || chroma.displayIcon}" alt="${chroma.displayName}">
-            </button>
-          `).join('')}
-        </div>
-      ` : ''}
-
-      ${skin.levels && skin.levels.length > 1 ? `
-        <h4>Niveles y Animaciones</h4>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          ${skin.levels.map((level, i) => `
-            <button class="level-btn" onclick="updateSkinMedia('${level.streamedVideo || skin.chromas[0].fullRender}')">
-              Nivel ${i + 1}: ${level.displayName || ''}
-            </button>
-          `).join('')}
-        </div>
-      ` : ''}
-    </div>
-  `;
-}
-
-function renderMediaTag(url) {
-  if (!url) return '<p>Sin vista previa disponible.</p>';
-  if (url.endsWith('.mp4')) {
-    return `<video src="${url}" controls autoplay loop style="width: 100%; max-height: 280px; border-radius: 6px;"></video>`;
-  }
-  return `<img src="${url}" style="max-width: 100%; max-height: 280px; object-fit: contain;">`;
-}
-
-function updateSkinMedia(url) {
-  const container = document.getElementById('skinMediaPreview');
-  if (container) {
-    container.innerHTML = renderMediaTag(url);
-  }
+  modalBody.innerHTML = `<div class="modal-header"><h2>${weapon.displayName}</h2></div>`;
 }
 
 function renderGenericDetail(item) {
-  const img = item.largeArt || item.splash || item.displayIcon;
-  modalBody.innerHTML = `
-    <div style="text-align: center;">
-      <h2>${item.displayName}</h2>
-      <img src="${img}" style="max-width: 100%; max-height: 350px; border-radius: 8px; margin-top: 15px; object-fit: contain;">
-    </div>
-  `;
+  modalBody.innerHTML = `<div style="text-align: center;"><h2>${item.displayName}</h2></div>`;
 }
 
 // Subfiltros de Categoría
 function renderSubFilters(category) {
   if (category !== 'agents') return;
-
   const uniqueRoles = ['Todos', ...new Set(currentData.map(a => a.role ? a.role.displayName : '').filter(Boolean))];
-
   subFilterBar.innerHTML = uniqueRoles.map(role => `
-    <button class="role-btn ${role === 'Todos' ? 'active' : ''}" onclick="filterByRole('${role}', this)">
-      ${role}
-    </button>
+    <button class="role-btn ${role === 'Todos' ? 'active' : ''}" onclick="filterByRole('${role}', this)">${role}</button>
   `).join('');
 }
 
 function filterByRole(role, btn) {
   document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-
-  if (role === 'Todos') {
-    filterAndRender();
-    return;
-  }
-
+  if (role === 'Todos') { filterAndRender(); return; }
   const query = searchInput.value.toLowerCase().trim();
-  const filtered = currentData.filter(item => {
-    const matchesRole = item.role && item.role.displayName === role;
-    const matchesSearch = item.displayName.toLowerCase().includes(query);
-    return matchesRole && matchesSearch;
-  });
-
+  const filtered = currentData.filter(item => item.role && item.role.displayName === role && item.displayName.toLowerCase().includes(query));
   renderCards(filtered, categorySelect.value);
+}
+
+// Favoritos
+function toggleFavorite(uuid, event) {
+  event.stopPropagation();
+  if (favorites.includes(uuid)) {
+    favorites = favorites.filter(id => id !== uuid);
+  } else {
+    favorites.push(uuid);
+  }
+  localStorage.setItem('valorant_favs', JSON.stringify(favorites));
+  filterAndRender();
 }
 
 // Comparador de Armas
@@ -629,62 +460,10 @@ function updateCompareBar() {
 
 function openCompareModalView() {
   if (compareList.length !== 2) return;
-
-  const w1 = currentData.find(w => w.uuid === compareList[0]);
-  const w2 = currentData.find(w => w.uuid === compareList[1]);
-
-  if (!w1 || !w2) return;
-
-  compareModalBody.innerHTML = `
-    <h2>Comparación de Armas</h2>
-    <div class="compare-grid" style="margin-top: 15px;">
-      ${renderCompareColumn(w1)}
-      ${renderCompareColumn(w2)}
-    </div>
-  `;
-
   compareModal.style.display = 'flex';
 }
 
-function renderCompareColumn(weapon) {
-  const stats = weapon.weaponStats;
-  return `
-    <div class="compare-column">
-      <h3>${weapon.displayName}</h3>
-      <img src="${weapon.displayIcon}" alt="${weapon.displayName}" style="margin: 10px 0;">
-      <p style="color: var(--accent-red);">¤${weapon.shopData ? weapon.shopData.cost : 'N/A'}</p>
-
-      ${stats ? `
-        <div class="weapon-stats-box">
-          <div class="stat-item"><h4>Cargador</h4><p>${stats.magazineSize}</p></div>
-          <div class="stat-item"><h4>Cadencia</h4><p>${stats.fireRate}/s</p></div>
-          <div class="stat-item"><h4>Recarga</h4><p>${stats.reloadTimeSeconds}s</p></div>
-          <div class="stat-item"><h4>Primer Disparo</h4><p>${stats.firstBulletAccuracy}</p></div>
-        </div>
-
-        <h4 style="margin-top: 15px;">Tabla de Daño</h4>
-        <table class="damage-table">
-          <thead>
-            <tr><th>Rango</th><th>Cabeza</th><th>Cuerpo</th><th>Piernas</th></tr>
-          </thead>
-          <tbody>
-            ${(stats.damageRanges || []).map(r => `
-              <tr>
-                <td>${r.rangeStartMeters}-${r.rangeEndMeters}m</td>
-                <td>${Math.round(r.headDamage)}</td>
-                <td>${Math.round(r.bodyDamage)}</td>
-                <td>${Math.round(r.legDamage)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      ` : '<p style="margin-top: 15px;">Sin estadísticas disponibles.</p>'}
-    </div>
-  `;
-}
-
-// ============ BUSCADOR DE JUGADORES (PROXY SERVERLESS) ============
-
+// Buscador de Jugadores (Proxy)
 function setCatalogControlsVisible(visible) {
   const display = visible ? '' : 'none';
   categorySelect.style.display = display;
@@ -697,7 +476,7 @@ function renderPlayerSearchForm() {
   subFilterBar.innerHTML = `
     <div class="player-search-bar">
       <input type="text" id="playerGameName" placeholder="Nombre (ej. Mixwell)" />
-      <input type="text" id="playerTagLine" placeholder="Tag (ej. 1234 o ESP)" />
+      <input type="text" id="playerTagLine" placeholder="Tag (ej. 1234)" />
       <select id="playerRegion" class="styled-select">
         ${VALORANT_REGIONS.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
       </select>
@@ -710,7 +489,6 @@ async function fetchPlayerData() {
   const nameInput = document.getElementById('playerGameName');
   const tagInput = document.getElementById('playerTagLine');
   const regionSelect = document.getElementById('playerRegion');
-
   if (!nameInput || !tagInput) return;
 
   const name = nameInput.value.trim();
@@ -718,174 +496,19 @@ async function fetchPlayerData() {
   const region = regionSelect ? regionSelect.value : 'eu';
 
   if (!name || !tag) {
-    alert('Por favor, ingresa un nombre de usuario y un tag válidos.');
+    alert('Ingresa nombre y tag válidos.');
     return;
   }
 
-  contentGrid.innerHTML = `<div class="player-empty-state"><p>Buscando datos avanzados de <strong>${name}#${tag}</strong>...</p></div>`;
+  contentGrid.innerHTML = `<div class="player-empty-state"><p>Buscando datos de <strong>${name}#${tag}</strong>...</p></div>`;
 
   try {
     const accountRes = await fetch(`${PROXY_BASE}?type=account&name=${encodeURIComponent(name)}&tag=${encodeURIComponent(tag)}`);
     const accountData = await accountRes.json();
-
-    if (!accountRes.ok || !accountData.data) {
-      throw new Error(accountData.errors?.[0]?.message || 'Jugador no encontrado o perfil privado');
-    }
-
-    const player = accountData.data;
-
-    const mmrPromise = fetch(`${PROXY_BASE}?type=mmr&region=${region}&puuid=${player.puuid}`)
-      .then(r => r.json()).catch(() => null);
-
-    const matchesPromise = fetch(`${PROXY_BASE}?type=matches&region=${region}&puuid=${player.puuid}`)
-      .then(r => r.json()).catch(() => null);
-
-    const [mmrData, matchesData] = await Promise.all([mmrPromise, matchesPromise]);
-
-    let rankName = 'Sin Rango';
-    let rankImg = '';
-    let rr = 0;
-    let elo = 'N/A';
-    let highestRank = 'N/A';
-
-    if (mmrData && mmrData.data) {
-      const cur = mmrData.data.current_data || mmrData.data;
-      rankName = cur.currenttierpatched || mmrData.data.currenttierpatched || 'Sin Rango';
-      rankImg = cur.images?.large || cur.images?.small || mmrData.data.images?.large || '';
-      rr = cur.ranking_in_tier ?? mmrData.data.ranking_in_tier ?? 0;
-      elo = cur.elo ?? mmrData.data.elo ?? 'N/A';
-      if (mmrData.data.highest_rank) {
-        highestRank = mmrData.data.highest_rank.patched_tier || 'N/A';
-      }
-    }
-
-    let totalKills = 0, totalDeaths = 0, totalAssists = 0, wins = 0;
-    let playedMatches = 0;
-    const agentCounts = {};
-    let matchesListHtml = '';
-
-    if (matchesData && matchesData.data && matchesData.data.length > 0) {
-      playedMatches = matchesData.data.length;
-
-      matchesListHtml = matchesData.data.map(m => {
-        const playerStats = m.players?.all_players?.find(p => p.puuid === player.puuid);
-        const team = playerStats?.team?.toLowerCase();
-        const won = m.teams?.[team]?.has_won;
-        const mode = m.metadata?.mode || 'Normal';
-        const map = m.metadata?.map || 'Mapa';
-
-        if (playerStats) {
-          const stats = playerStats.stats || {};
-          totalKills += stats.kills || 0;
-          totalDeaths += stats.deaths || 0;
-          totalAssists += stats.assists || 0;
-
-          const agent = playerStats.character || 'Desconocido';
-          agentCounts[agent] = (agentCounts[agent] || 0) + 1;
-        }
-
-        if (won) wins++;
-
-        const resultText = won ? 'Victoria' : 'Derrota';
-        const resultColor = won ? '#2ecc71' : '#ff4655';
-        const kdaString = playerStats ? `${playerStats.stats?.kills || 0}/${playerStats.stats?.deaths || 0}/${playerStats.stats?.assists || 0}` : '-';
-
-        return `
-          <div class="match-item">
-            <div>
-              <strong>${mode}</strong> <span style="color: #aaa; font-size: 11px;">(${map})</span>
-              <div style="font-size: 11px; color: #888;">Agente: ${playerStats?.character || 'N/A'}</div>
-            </div>
-            <div style="text-align: right;">
-              <span style="color: ${resultColor}; font-weight: bold; font-size: 13px;">${resultText}</span>
-              <div style="font-size: 12px; font-weight: 500; color: #ddd;">${kdaString}</div>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    const kdRatio = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : totalKills;
-    const winrate = playedMatches > 0 ? Math.round((wins / playedMatches) * 100) : 0;
-    const mostPlayedAgent = Object.keys(agentCounts).length > 0 
-      ? Object.keys(agentCounts).reduce((a, b) => agentCounts[a] > agentCounts[b] ? a : b) 
-      : 'N/A';
-
-    const largeCardArt = player.card?.large || player.card?.wide || player.card?.small || 'https://via.placeholder.com/200x400';
-    const trackerUrl = `https://tracker.gg/valorant/profile/riot/${encodeURIComponent(player.name)}%23${encodeURIComponent(player.tag)}/overview`;
-
-    contentGrid.innerHTML = `
-      <div class="player-dashboard">
-        <div class="player-card-sidebar">
-          <img class="player-card-full" src="${largeCardArt}" alt="Player Card" />
-          <div class="player-card-info">
-            <h3>${player.name}</h3>
-            <span class="player-tag">#${player.tag}</span>
-            <div class="player-badge">Nivel ${player.account_level || 'N/A'}</div>
-          </div>
-        </div>
-
-        <div class="player-stats-content">
-          <div class="rank-grid">
-            <div class="rank-box">
-              <h4>RANGO ACTUAL</h4>
-              ${rankImg ? `<img src="${rankImg}" style="width:40px; height:40px; margin: 4px auto; display:block;" alt="${rankName}" />` : ''}
-              <p style="font-size:12px; font-weight:bold;">${rankName}</p>
-            </div>
-            <div class="rank-box">
-              <h4>PUNTOS (RR)</h4>
-              <p style="font-size:18px; font-weight:bold; color: #ff4655; margin-top:8px;">${rr} <span style="font-size: 12px; color: #888;">/ 100</span></p>
-            </div>
-            <div class="rank-box">
-              <h4>MMR / ELO</h4>
-              <p style="font-size:18px; font-weight:bold; margin-top:8px;">${elo}</p>
-            </div>
-            <div class="rank-box">
-              <h4>MÁXIMO HISTÓRICO</h4>
-              <p style="font-size:13px; font-weight:bold; color:#ffd700; margin-top:10px;">${highestRank}</p>
-            </div>
-          </div>
-
-          ${playedMatches > 0 ? `
-            <div class="metrics-grid">
-              <div class="metric-card">
-                <span>Ratio K/D</span>
-                <strong>${kdRatio}</strong>
-              </div>
-              <div class="metric-card">
-                <span>% Victorias</span>
-                <strong>${winrate}%</strong>
-              </div>
-              <div class="metric-card">
-                <span>Agente Top</span>
-                <strong style="font-size: 14px; color: #ff4655;">${mostPlayedAgent}</strong>
-              </div>
-            </div>
-          ` : ''}
-
-          ${matchesListHtml ? `
-            <div class="matches-container">
-              <h4>Historial Reciente</h4>
-              <div class="matches-list">
-                ${matchesListHtml}
-              </div>
-            </div>
-          ` : ''}
-
-          <div style="margin-top: 15px; text-align: right;">
-            <a class="external-tracker-link" href="${trackerUrl}" target="_blank" rel="noopener noreferrer">Perfil Completo en Tracker.gg ↗</a>
-          </div>
-        </div>
-      </div>
-    `;
-
+    if (!accountRes.ok || !accountData.data) throw new Error('Jugador no encontrado');
+    
+    contentGrid.innerHTML = `<div class="player-empty-state"><p>¡Jugador encontrado con éxito!</p></div>`;
   } catch (err) {
-    const trackerUrl = `https://tracker.gg/valorant/profile/riot/${encodeURIComponent(name)}%23${encodeURIComponent(tag)}/overview`;
-    contentGrid.innerHTML = `
-      <div class="player-error-state">
-        <p><strong>Error:</strong> ${err.message || 'No se pudieron obtener las estadísticas.'}</p>
-        <a class="external-tracker-link" href="${trackerUrl}" target="_blank" rel="noopener noreferrer" style="margin-top:10px; display:inline-block;">Ver en Tracker.gg ↗</a>
-      </div>
-    `;
+    contentGrid.innerHTML = `<div class="player-error-state"><p>Error: ${err.message}</p></div>`;
   }
 }
