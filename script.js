@@ -16,8 +16,9 @@ let currentData = [];
 let favorites = JSON.parse(localStorage.getItem('valorant_favs')) || [];
 let compareList = [];
 let showingFavsOnly = false;
-let viewMode = 'catalog'; // 'catalog' | 'player'
-let currentUserId = 'usuario_demo_123'; // Cambiará al loguearse con Supabase Auth
+let viewMode = 'catalog'; // 'catalog' | 'player' | 'profile'
+let isLoggedIn = false;
+let loggedUserEmail = '';
 
 // Elementos del DOM
 const categorySelect = document.getElementById('categorySelect');
@@ -78,7 +79,7 @@ function shutdownCompareModal() {
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
   loadCategoryData();
-  switchAuthTab('login'); // Inicializar pestaña por defecto
+  switchAuthTab('profile');
 
   categorySelect.addEventListener('change', () => {
     compareList = [];
@@ -110,8 +111,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Eventos de Autenticación Modal
   openAuthModalBtn.addEventListener('click', () => {
+    switchAuthTab('profile');
     authModal.style.display = 'flex';
   });
 
@@ -136,17 +137,46 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ============ CONTROL DE PESTAÑAS DE AUTENTICACIÓN ============
+function returnToCatalog() {
+  viewMode = 'catalog';
+  playerSearchToggleBtn.classList.remove('active');
+  setCatalogControlsVisible(true);
+  loadCategoryData();
+}
+
+// ============ GESTIÓN DE PERFIL Y AUTENTICACIÓN ============
 function switchAuthTab(tab, event) {
   if (event) event.preventDefault();
   const container = document.getElementById('authFormContainer');
   const subtitle = document.getElementById('authSubtitle');
   
   document.querySelectorAll('.auth-tab-btn').forEach(b => b.classList.remove('active'));
-  const activeBtn = document.querySelectorAll('.auth-tab-btn')[tab === 'login' ? 0 : tab === 'register' ? 1 : 2];
+  const activeBtn = document.querySelectorAll('.auth-tab-btn')[tab === 'profile' ? 0 : tab === 'login' ? 1 : 2];
   if (activeBtn) activeBtn.classList.add('active');
 
-  if (tab === 'login') {
+  if (tab === 'profile') {
+    subtitle.textContent = 'Panel de cuenta y elementos guardados';
+    container.innerHTML = `
+      <div style="text-align: center; display: flex; flex-direction: column; gap: 15px;">
+        <div style="background: #0f1923; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <p style="font-size: 13px; color: #888;">Estado de la Sesión</p>
+          <strong style="font-size: 15px; color: ${isLoggedIn ? '#2ecc71' : 'var(--accent-red)'};">
+            ${isLoggedIn ? `Conectado como (${loggedUserEmail})` : 'Modo Invitado / Local'}
+          </strong>
+        </div>
+        
+        <div style="background: #0f1923; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <h4 style="margin-bottom: 8px; color: #fff;">Mis Favoritos Seleccionados</h4>
+          <p style="font-size: 22px; font-weight: bold; color: var(--accent-red);">${favorites.length} <span style="font-size: 12px; color: #aaa;">elementos en total</span></p>
+          <button onclick="openFavoritesDashboard()" class="role-btn active" style="margin-top: 12px; width: 100%; padding: 8px;">Ver Mis Favoritos en Pantalla</button>
+        </div>
+
+        ${isLoggedIn ? `
+          <button onclick="handleLogout()" class="level-btn" style="background: var(--accent-red); color: #fff; width: 100%;">Cerrar Sesión</button>
+        ` : ''}
+      </div>
+    `;
+  } else if (tab === 'login') {
     subtitle.textContent = 'Introduce tus credenciales de acceso';
     container.innerHTML = `
       <form onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 12px;">
@@ -156,78 +186,57 @@ function switchAuthTab(tab, event) {
       </form>
     `;
   } else if (tab === 'register') {
-    subtitle.textContent = 'Crea tu cuenta y verifica con tu correo';
+    subtitle.textContent = 'Crea tu cuenta de acceso';
     container.innerHTML = `
       <form onsubmit="handleRegister(event)" style="display: flex; flex-direction: column; gap: 12px;">
         <input type="text" id="regUsername" placeholder="Nombre de usuario" required class="styled-input" />
-        <input type="email" id="regEmail" placeholder="Correo electrónico personal" required class="styled-input" />
-        <input type="password" id="regPassword" placeholder="Contraseña (mínimo 6 caracteres)" required class="styled-input" />
-        <button type="submit" class="role-btn active" style="margin-top: 10px; width: 100%; padding: 10px;">Registrarse y Enviar Verificación</button>
-      </form>
-    `;
-  } else if (tab === 'recovery') {
-    subtitle.textContent = 'Te enviaremos un enlace de restablecimiento';
-    container.innerHTML = `
-      <form onsubmit="handleRecovery(event)" style="display: flex; flex-direction: column; gap: 12px;">
-        <input type="email" id="recEmail" placeholder="Correo electrónico de tu cuenta" required class="styled-input" />
-        <button type="submit" class="role-btn active" style="margin-top: 10px; width: 100%; padding: 10px;">Enviar Enlace de Recuperación</button>
+        <input type="email" id="regEmail" placeholder="Correo electrónico" required class="styled-input" />
+        <input type="password" id="regPassword" placeholder="Contraseña" required class="styled-input" />
+        <button type="submit" class="role-btn active" style="margin-top: 10px; width: 100%; padding: 10px;">Crear Cuenta</button>
       </form>
     `;
   }
 }
 
-// Lógica simulada conectable a Supabase Auth
+function openFavoritesDashboard() {
+  authModal.style.display = 'none';
+  viewMode = 'catalog';
+  setCatalogControlsVisible(true);
+  subFilterBar.innerHTML = `<div style="padding: 8px; font-size: 13px; color: var(--accent-red); font-weight: bold;">Mostrando Todos tus Elementos Favoritos (${favorites.length})</div>`;
+  
+  // Buscar en todas las categorías cargadas o filtrar las actuales con los favs
+  showingFavsOnly = true;
+  favFilterBtn.classList.add('active');
+  filterAndRender();
+}
+
 async function handleRegister(e) {
   e.preventDefault();
   const email = document.getElementById('regEmail').value;
-  const password = document.getElementById('regPassword').value;
   const username = document.getElementById('regUsername').value;
-
-  const btn = e.target.querySelector('button');
-  btn.textContent = '⚡ SINCRONIZANDO CON PROTOCOLO...';
-  btn.disabled = true;
-
-  try {
-    // Aquí invocarías tu cliente: await supabase.auth.signUp({ email, password, options: { data: { username } } })
-    setTimeout(() => {
-      alert(`¡Cuenta creada con éxito, ${username}! Te hemos enviado un correo de verificación a ${email}.`);
-      switchAuthTab('login');
-    }, 1500);
-  } catch (err) {
-    alert('Error en el registro: ' + err.message);
-    btn.textContent = 'Registrarse y Enviar Verificación';
-    btn.disabled = false;
-  }
+  isLoggedIn = true;
+  loggedUserEmail = email;
+  document.getElementById('authButtonText').textContent = username;
+  alert(`¡Cuenta creada y sesión iniciada correctamente, ${username}!`);
+  authModal.style.display = 'none';
 }
 
 async function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
-
-  try {
-    // Aquí invocarías tu cliente: const { data } = await supabase.auth.signInWithPassword({ email, password })
-    setTimeout(() => {
-      authModal.style.display = 'none';
-      document.getElementById('authButtonText').textContent = 'Mi Cuenta';
-      alert('¡Acceso concedido, Agente!');
-    }, 800);
-  } catch (err) {
-    alert('Credenciales incorrectas.');
-  }
+  isLoggedIn = true;
+  loggedUserEmail = email;
+  document.getElementById('authButtonText').textContent = email.split('@')[0];
+  alert('¡Bienvenido de nuevo, Agente!');
+  authModal.style.display = 'none';
 }
 
-async function handleRecovery(e) {
-  e.preventDefault();
-  const email = document.getElementById('recEmail').value;
-  
-  try {
-    // Aquí invocarías tu cliente: await supabase.auth.resetPasswordForEmail(email)
-    alert(`Se ha enviado un enlace de recuperación seguro a ${email}. Revisa tu bandeja de entrada.`);
-    switchAuthTab('login');
-  } catch (err) {
-    alert('Error al procesar la recuperación.');
-  }
+function handleLogout() {
+  isLoggedIn = false;
+  loggedUserEmail = '';
+  document.getElementById('authButtonText').textContent = 'Mi Cuenta';
+  switchAuthTab('profile');
+  alert('Sesión cerrada correctamente.');
 }
 
 // Carga de Datos desde API Oficial
@@ -340,7 +349,7 @@ function renderCards(data, category) {
   });
 }
 
-// Detalle Modal
+// Detalle Modal Completo Restaurado
 function openDetailModal(uuid) {
   const item = currentData.find(i => i.uuid === uuid);
   if (!item) return;
@@ -349,13 +358,27 @@ function openDetailModal(uuid) {
   modalBody.innerHTML = '';
 
   switch (category) {
-    case 'agents': renderAgentDetail(item); break;
-    case 'weapons': renderWeaponDetail(item); break;
-    case 'maps': renderMapDetail(item); break;
-    case 'playercards': renderPlayerCardDetail(item); break;
-    case 'sprays': renderSprayDetail(item); break;
-    case 'buddies': renderBuddyDetail(item); break;
-    default: renderGenericDetail(item); break;
+    case 'agents':
+      renderAgentDetail(item);
+      break;
+    case 'weapons':
+      renderWeaponDetail(item);
+      break;
+    case 'maps':
+      renderMapDetail(item);
+      break;
+    case 'playercards':
+      renderPlayerCardDetail(item);
+      break;
+    case 'sprays':
+      renderSprayDetail(item);
+      break;
+    case 'buddies':
+      renderBuddyDetail(item);
+      break;
+    default:
+      renderGenericDetail(item);
+      break;
   }
 
   detailModal.style.display = 'flex';
@@ -363,11 +386,48 @@ function openDetailModal(uuid) {
 
 function renderMapDetail(map) {
   const callouts = map.callouts || [];
+
   modalBody.innerHTML = `
     <div style="text-align: center;">
       <h2>${map.displayName}</h2>
       <p style="color: #888; font-size: 13px; margin-bottom: 15px;">${map.coordinates || ''}</p>
+
       ${map.splash ? `<img src="${map.splash}" style="width: 100%; max-height: 160px; object-fit: cover; border-radius: 8px; margin-bottom: 15px;">` : ''}
+
+      ${map.displayIcon ? `
+        <h3>Esquema Táctico del Mapa</h3>
+        <div style="position: relative; display: inline-block; margin-top: 10px; max-width: 100%; width: 100%; background: #0f1923; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+          <img src="${map.displayIcon}" alt="Esquema ${map.displayName}" style="width: 100%; height: auto; display: block;" />
+          <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+            ${callouts.map(callout => {
+              if (!callout.location) return '';
+              const left = callout.location.x * 100;
+              const top = callout.location.y * 100;
+              const text = callout.regionName.toUpperCase();
+
+              return `
+                <div style="
+                  position: absolute;
+                  left: ${left}%;
+                  top: ${top}%;
+                  transform: translate(-50%, -50%);
+                  background: rgba(15, 25, 35, 0.9);
+                  border: 1px solid #ff4655;
+                  color: #ffffff;
+                  font-size: 9px;
+                  font-weight: bold;
+                  padding: 2px 5px;
+                  border-radius: 3px;
+                  white-space: nowrap;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+                ">
+                  ${text}
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : '<p>Esquema no disponible</p>'}
     </div>
   `;
 }
@@ -382,44 +442,234 @@ function renderAgentDetail(agent) {
       </div>
     </div>
     <p style="margin-bottom: 15px; color: #ccc; font-size: 14px;">${agent.description || ''}</p>
+    
+    <h3>Habilidades</h3>
+    <div class="abilities-grid">
+      ${(agent.abilities || []).map(ability => `
+        <div class="ability-card" onclick="playAbilityVideo('${ability.video || ''}', '${ability.displayName}')" style="cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            ${ability.displayIcon ? `<img src="${ability.displayIcon}" style="width: 24px; height: 24px;">` : ''}
+            <strong>${ability.displayName}</strong>
+            ${ability.video ? '<span style="font-size: 10px; background: var(--accent-red); padding: 2px 6px; border-radius: 4px; margin-left: auto;">VÍDEO ▶</span>' : ''}
+          </div>
+          <p style="font-size: 12px; color: #aaa;">${ability.description || ''}</p>
+        </div>
+      `).join('')}
+    </div>
+    <div id="agentVideoPreview" style="margin-top: 15px;"></div>
+  `;
+}
+
+function playAbilityVideo(url, name) {
+  const container = document.getElementById('agentVideoPreview');
+  if (!container) return;
+
+  if (!url) {
+    container.innerHTML = '<p style="color: #888; text-align: center; font-size: 12px;">No hay vídeo de demostración disponible.</p>';
+    return;
+  }
+
+  container.innerHTML = `
+    <h4 style="margin-bottom: 8px;">Demostración: ${name}</h4>
+    <video src="${url}" controls autoplay loop style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color);"></video>
   `;
 }
 
 function renderPlayerCardDetail(card) {
-  modalBody.innerHTML = `<div style="text-align: center;"><h2>${card.displayName}</h2></div>`;
+  const videoUrl = card.animationMp4;
+
+  modalBody.innerHTML = `
+    <div style="text-align: center;">
+      <h2>${card.displayName}</h2>
+      <div class="skin-media-preview" style="margin-top: 15px;">
+        ${videoUrl ? `
+          <video src="${videoUrl}" controls autoplay loop style="max-width: 100%; max-height: 350px; border-radius: 6px;"></video>
+        ` : `
+          <img src="${card.largeArt || card.wideArt || card.displayIcon}" style="max-width: 100%; max-height: 350px; object-fit: contain;">
+        `}
+      </div>
+      ${card.wideArt ? `
+        <h4 style="margin-top: 15px;">Banner Horizontal</h4>
+        <img src="${card.wideArt}" style="width: 100%; border-radius: 6px; margin-top: 5px;">
+      ` : ''}
+    </div>
+  `;
 }
 
 function renderSprayDetail(spray) {
-  modalBody.innerHTML = `<div style="text-align: center;"><h2>${spray.displayName}</h2></div>`;
+  const animatedSrc = spray.animationPng || spray.animationGif || spray.fullTransparentIcon || spray.displayIcon;
+
+  modalBody.innerHTML = `
+    <div style="text-align: center;">
+      <h2>${spray.displayName}</h2>
+      <div class="skin-media-preview" style="margin-top: 15px;">
+        <img src="${animatedSrc}" style="max-width: 250px; max-height: 250px; object-fit: contain;">
+      </div>
+    </div>
+  `;
 }
 
 function renderBuddyDetail(buddy) {
-  modalBody.innerHTML = `<div style="text-align: center;"><h2>${buddy.displayName}</h2></div>`;
+  modalBody.innerHTML = `
+    <div style="text-align: center;">
+      <h2>${buddy.displayName}</h2>
+      <div class="skin-media-preview" id="buddyMediaPreview" style="margin-top: 15px;">
+        <img src="${buddy.displayIcon}" style="max-width: 200px; max-height: 200px; object-fit: contain;">
+      </div>
+      ${buddy.levels && buddy.levels.length > 1 ? `
+        <h4 style="margin-top: 15px;">Niveles del Llavero</h4>
+        <div style="display: flex; gap: 8px; justify-content: center; margin-top: 8px;">
+          ${buddy.levels.map((level, i) => `
+            <button class="level-btn" onclick="updateBuddyMedia('${level.displayIcon}')">
+              ${level.displayName || `Nivel ${i + 1}`}
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function updateBuddyMedia(url) {
+  const container = document.getElementById('buddyMediaPreview');
+  if (container) {
+    container.innerHTML = `<img src="${url}" style="max-width: 200px; max-height: 200px; object-fit: contain;">`;
+  }
 }
 
 function renderWeaponDetail(weapon) {
-  modalBody.innerHTML = `<div class="modal-header"><h2>${weapon.displayName}</h2></div>`;
+  const stats = weapon.weaponStats;
+  
+  modalBody.innerHTML = `
+    <div class="modal-header">
+      <img src="${weapon.displayIcon}" alt="${weapon.displayName}" style="width: 120px; height: auto;">
+      <div>
+        <h2>${weapon.displayName}</h2>
+        <p style="color: #888;">${weapon.shopData ? weapon.shopData.categoryText : ''} - ¤${weapon.shopData ? weapon.shopData.cost : '0'}</p>
+      </div>
+    </div>
+
+    ${stats ? `
+      <div class="weapon-stats-box">
+        <div class="stat-item"><h4>Cargador</h4><p>${stats.magazineSize}</p></div>
+        <div class="stat-item"><h4>Cadencia</h4><p>${stats.fireRate}/s</p></div>
+        <div class="stat-item"><h4>Recarga</h4><p>${stats.reloadTimeSeconds}s</p></div>
+        <div class="stat-item"><h4>Velocidad Equipar</h4><p>${stats.equipTimeSeconds}s</p></div>
+      </div>
+    ` : ''}
+
+    <h3 style="margin-top: 20px;">Skins Disponibles</h3>
+    <div class="skins-grid">
+      ${(weapon.skins || []).map(skin => {
+        const icon = skin.displayIcon || skin.chromas?.[0]?.fullRender;
+        if (!icon) return '';
+        return `
+          <div class="skin-card" onclick="viewSkinDetail('${weapon.uuid}', '${skin.uuid}')">
+            <img src="${icon}" alt="${skin.displayName}">
+            <p style="font-size: 11px; margin-top: 5px;">${skin.displayName}</p>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function viewSkinDetail(weaponUuid, skinUuid) {
+  const weapon = currentData.find(w => w.uuid === weaponUuid);
+  if (!weapon) return;
+
+  const skin = weapon.skins.find(s => s.uuid === skinUuid);
+  if (!skin) return;
+
+  const defaultMedia = skin.levels?.find(l => l.streamedVideo)?.streamedVideo || skin.chromas?.[0]?.fullRender || skin.displayIcon;
+
+  modalBody.innerHTML = `
+    <button class="level-btn" onclick="openDetailModal('${weaponUuid}')" style="margin-bottom: 15px;">← Volver a Skins</button>
+    <h2>${skin.displayName}</h2>
+    <div class="skin-detail-container" style="margin-top: 15px;">
+      <div class="skin-media-preview" id="skinMediaPreview">
+        ${renderMediaTag(defaultMedia)}
+      </div>
+
+      ${skin.chromas && skin.chromas.length > 1 ? `
+        <h4>Variantes / Chromas</h4>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+          ${skin.chromas.map(chroma => `
+            <button class="swatch-btn" onclick="updateSkinMedia('${chroma.streamedVideo || chroma.fullRender || chroma.displayIcon}')">
+              <img src="${chroma.swatch || chroma.displayIcon}" alt="${chroma.displayName}">
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      ${skin.levels && skin.levels.length > 1 ? `
+        <h4>Niveles y Animaciones</h4>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          ${skin.levels.map((level, i) => `
+            <button class="level-btn" onclick="updateSkinMedia('${level.streamedVideo || skin.chromas[0].fullRender}')">
+              Nivel ${i + 1}: ${level.displayName || ''}
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderMediaTag(url) {
+  if (!url) return '<p>Sin vista previa disponible.</p>';
+  if (url.endsWith('.mp4')) {
+    return `<video src="${url}" controls autoplay loop style="width: 100%; max-height: 280px; border-radius: 6px;"></video>`;
+  }
+  return `<img src="${url}" style="max-width: 100%; max-height: 280px; object-fit: contain;">`;
+}
+
+function updateSkinMedia(url) {
+  const container = document.getElementById('skinMediaPreview');
+  if (container) {
+    container.innerHTML = renderMediaTag(url);
+  }
 }
 
 function renderGenericDetail(item) {
-  modalBody.innerHTML = `<div style="text-align: center;"><h2>${item.displayName}</h2></div>`;
+  const img = item.largeArt || item.splash || item.displayIcon;
+  modalBody.innerHTML = `
+    <div style="text-align: center;">
+      <h2>${item.displayName}</h2>
+      <img src="${img}" style="max-width: 100%; max-height: 350px; border-radius: 8px; margin-top: 15px; object-fit: contain;">
+    </div>
+  `;
 }
 
 // Subfiltros de Categoría
 function renderSubFilters(category) {
   if (category !== 'agents') return;
+
   const uniqueRoles = ['Todos', ...new Set(currentData.map(a => a.role ? a.role.displayName : '').filter(Boolean))];
+
   subFilterBar.innerHTML = uniqueRoles.map(role => `
-    <button class="role-btn ${role === 'Todos' ? 'active' : ''}" onclick="filterByRole('${role}', this)">${role}</button>
+    <button class="role-btn ${role === 'Todos' ? 'active' : ''}" onclick="filterByRole('${role}', this)">
+      ${role}
+    </button>
   `).join('');
 }
 
 function filterByRole(role, btn) {
   document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  if (role === 'Todos') { filterAndRender(); return; }
+
+  if (role === 'Todos') {
+    filterAndRender();
+    return;
+  }
+
   const query = searchInput.value.toLowerCase().trim();
-  const filtered = currentData.filter(item => item.role && item.role.displayName === role && item.displayName.toLowerCase().includes(query));
+  const filtered = currentData.filter(item => {
+    const matchesRole = item.role && item.role.displayName === role;
+    const matchesSearch = item.displayName.toLowerCase().includes(query);
+    return matchesRole && matchesSearch;
+  });
+
   renderCards(filtered, categorySelect.value);
 }
 
@@ -460,7 +710,58 @@ function updateCompareBar() {
 
 function openCompareModalView() {
   if (compareList.length !== 2) return;
+
+  const w1 = currentData.find(w => w.uuid === compareList[0]);
+  const w2 = currentData.find(w => w.uuid === compareList[1]);
+
+  if (!w1 || !w2) return;
+
+  compareModalBody.innerHTML = `
+    <h2>Comparación de Armas</h2>
+    <div class="compare-grid" style="margin-top: 15px;">
+      ${renderCompareColumn(w1)}
+      ${renderCompareColumn(w2)}
+    </div>
+  `;
+
   compareModal.style.display = 'flex';
+}
+
+function renderCompareColumn(weapon) {
+  const stats = weapon.weaponStats;
+  return `
+    <div class="compare-column">
+      <h3>${weapon.displayName}</h3>
+      <img src="${weapon.displayIcon}" alt="${weapon.displayName}" style="margin: 10px 0;">
+      <p style="color: var(--accent-red);">¤${weapon.shopData ? weapon.shopData.cost : 'N/A'}</p>
+
+      ${stats ? `
+        <div class="weapon-stats-box">
+          <div class="stat-item"><h4>Cargador</h4><p>${stats.magazineSize}</p></div>
+          <div class="stat-item"><h4>Cadencia</h4><p>${stats.fireRate}/s</p></div>
+          <div class="stat-item"><h4>Recarga</h4><p>${stats.reloadTimeSeconds}s</p></div>
+          <div class="stat-item"><h4>Primer Disparo</h4><p>${stats.firstBulletAccuracy}</p></div>
+        </div>
+
+        <h4 style="margin-top: 15px;">Tabla de Daño</h4>
+        <table class="damage-table">
+          <thead>
+            <tr><th>Rango</th><th>Cabeza</th><th>Cuerpo</th><th>Piernas</th></tr>
+          </thead>
+          <tbody>
+            ${(stats.damageRanges || []).map(r => `
+              <tr>
+                <td>${r.rangeStartMeters}-${r.rangeEndMeters}m</td>
+                <td>${Math.round(r.headDamage)}</td>
+                <td>${Math.round(r.bodyDamage)}</td>
+                <td>${Math.round(r.legDamage)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : '<p style="margin-top: 15px;">Sin estadísticas disponibles.</p>'}
+    </div>
+  `;
 }
 
 // Buscador de Jugadores (Proxy)
