@@ -384,58 +384,179 @@ body {
   .top-bar { padding: 10px 15px; }
 }
 
-/* --- ESTILOS PARA EL MENÚ PRINCIPAL (HUB) --- */
+/* --- ESTILOS CINEMÁTICOS TIPO VALORANT HUD PARA EL HUB --- */
 .main-hub-container {
   grid-column: 1 / -1;
   width: 100%;
-  max-width: 1000px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 10px 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.hub-header-title {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.hub-header-title h1 {
+  color: #fff;
+  font-size: 32px;
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  text-shadow: 0 0 15px rgba(255, 70, 85, 0.4);
+}
+
+.hub-header-title p {
+  color: #8b9bb4;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+/* Fondo animado sutil con líneas de energía (Estilo HUD de Valorant) */
+body {
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: 
+    linear-gradient(rgba(15, 25, 35, 0.85), rgba(10, 15, 22, 0.95)),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 236, 236, 0.015) 2px, rgba(0, 236, 236, 0.015) 4px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Animación de pulso láser flotante para el fondo */
+@keyframes valorantScanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(1000%); }
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 5px;
+  background: linear-gradient(90deg, transparent, rgba(255, 70, 85, 0.4), transparent);
+  animation: valorantScanline 8s linear infinite;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .hub-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* Exactamente 3 columnas */
-  grid-template-rows: repeat(2, auto);    /* Exactamente 2 filas */
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, auto);
   gap: 25px;
-  margin-top: 30px;
   width: 100%;
 }
 
 .hub-card {
-  background: linear-gradient(135deg, #0f1923 0%, #16222f 100%);
-  /* Efecto de borde con dos colores (Rojo Valorant y Cian/Azulado eléctrico) */
-  border: 2px solid transparent;
-  border-image: linear-gradient(135deg, #ff4655, #00ecec) 1;
-  border-radius: 4px; /* Estilo tecnológico angular característico del juego */
-  padding: 30px 20px;
-  cursor: pointer;
-  transition: all 0.3s ease;
   position: relative;
+  height: 190px;
+  background: linear-gradient(135deg, #0f1923 0%, #16222f 100%);
+  border-radius: 4px; /* Bordes rectos con esquinas cortadas típicas de Riot */
   overflow: hidden;
+  cursor: pointer;
+  /* Doble color de borde neón (Rojo Valorant y Cian) */
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   text-align: center;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  padding: 20px;
 }
 
-/* Brillo y elevación al pasar el ratón */
+/* Patrón de celdas holográficas tácticas en el fondo de la tarjeta en lugar de fotos cuadradas */
+.hub-card-bg {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-image: radial-gradient(rgba(0, 236, 236, 0.1) 1px, transparent 1px);
+  background-size: 16px 16px;
+  opacity: 0.5;
+  transition: all 0.4s ease;
+}
+
+/* Contenido de la tarjeta */
+.hub-card-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hub-badge {
+  font-size: 10px;
+  font-weight: 800;
+  color: #00ecec;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  background: rgba(0, 236, 236, 0.1);
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+
+.hub-card-content h3 {
+  color: #fff;
+  font-size: 24px;
+  margin-bottom: 6px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  transition: color 0.3s ease;
+}
+
+.hub-card-content p {
+  color: #8b9bb4;
+  font-size: 12px;
+  margin: 0;
+  max-width: 220px;
+}
+
+/* Efecto de activación (Hover) idéntico a las pantallas de selección del juego */
 .hub-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 10px 25px rgba(255, 70, 85, 0.3), 0 0 15px rgba(0, 236, 236, 0.2);
+  border-color: #ff4655;
+  box-shadow: 0 10px 30px rgba(255, 70, 85, 0.3), inset 0 0 15px rgba(255, 70, 85, 0.15);
   background: linear-gradient(135deg, #16222f 0%, #1f3044 100%);
 }
 
-.hub-card-inner h3 {
-  color: #fff;
-  font-size: 22px;
-  margin-bottom: 10px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+.hub-card:hover .hub-card-bg {
+  background-image: radial-gradient(rgba(255, 70, 85, 0.2) 1px, transparent 1px);
+  opacity: 0.8;
 }
 
-.hub-card-inner p {
-  color: #8b9bb4;
-  font-size: 13px;
-  margin: 0;
+.hub-card:hover h3 {
+  color: #ff4655;
+  text-shadow: 0 0 10px rgba(255, 70, 85, 0.5);
+}
+
+.hub-card:hover .hub-badge {
+  color: #ff4655;
+  background: rgba(255, 70, 85, 0.15);
+}
+
+/* Responsivo para móviles */
+@media (max-width: 900px) {
+  .hub-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .hub-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Responsivo para pantallas pequeñas (móviles o tablets estrechas) */
