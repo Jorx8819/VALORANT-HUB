@@ -176,49 +176,63 @@ function showMainHub() {
   if (contentGrid) {
     contentGrid.innerHTML = `
       <div class="main-hub-container">
-        <h1 style="color: #fff; margin-bottom: 10px; text-align: center;">VALORANT DATABASE & TRACKER</h1>
-        <p style="color: #888; margin-bottom: 20px; text-align: center;">Selecciona una sección para comenzar</p>
+        <div class="hub-header-title">
+          <h1>VALORANT DATABASE & TRACKER</h1>
+          <p>Selecciona una sección táctica para comenzar</p>
+        </div>
         
         <div class="hub-grid">
           <div class="hub-card" onclick="selectHubSection('agents')">
-            <div class="hub-card-inner">
+            <div class="hub-card-bg" style="background-image: url('https://media.valorant-api.com/agents/e370fa57-4757-3604-3648-499e1f642d3f/displayicon.png');"></div>
+            <div class="hub-card-content">
+              <span class="hub-badge">ROLES Y PODERES</span>
               <h3>Agentes</h3>
-              <p>Descubre habilidades y roles</p>
+              <p>Descubre habilidades, historias y tácticas</p>
             </div>
           </div>
 
           <div class="hub-card" onclick="selectHubSection('weapons')">
-            <div class="hub-card-inner">
+            <div class="hub-card-bg" style="background-image: url('https://media.valorant-api.com/weapons/ee8e8d15-496b-07ac-e5f6-8fae5d4c7b1a/displayicon.png');"></div>
+            <div class="hub-card-content">
+              <span class="hub-badge">ARSENAL</span>
               <h3>Armas y Skins</h3>
-              <p>Estadísticas y comparador</p>
+              <p>Estadísticas, chromas y comparador</p>
             </div>
           </div>
 
           <div class="hub-card" onclick="selectHubSection('maps')">
-            <div class="hub-card-inner">
+            <div class="hub-card-bg" style="background-image: url('https://media.valorant-api.com/maps/ee613f1f-4d9a-418e-a4cf-3428383e206f/splash.png');"></div>
+            <div class="hub-card-content">
+              <span class="hub-badge">UBICACIONES</span>
               <h3>Mapas</h3>
-              <p>Esquemas tácticos y llamadas</p>
+              <p>Esquemas tácticos, llamadas y layouts</p>
             </div>
           </div>
 
           <div class="hub-card" onclick="selectHubSection('playercards')">
-            <div class="hub-card-inner">
+            <div class="hub-card-bg" style="background-image: url('https://media.valorant-api.com/playercards/9fb53414-464e-f332-dfc0-83af0ca8d962/largeart.png');"></div>
+            <div class="hub-card-content">
+              <span class="hub-badge">COLECCIONABLES</span>
               <h3>Tarjetas</h3>
-              <p>Arte y coleccionables</p>
+              <p>Arte oficial y fondos exclusivos</p>
             </div>
           </div>
 
           <div class="hub-card" onclick="selectHubSection('sprays')">
-            <div class="hub-card-inner">
+            <div class="hub-card-bg" style="background-image: url('https://media.valorant-api.com/sprays/d7285623-455b-4395-885e-99f6b9bc28fb/displayicon.png');"></div>
+            <div class="hub-card-content">
+              <span class="hub-badge">EXPRESIÓN</span>
               <h3>Graffitis</h3>
-              <p>Sprays animados y estáticos</p>
+              <p>Sprays animados, estáticos y gestos</p>
             </div>
           </div>
 
           <div class="hub-card" onclick="selectHubSection('buddies')">
-            <div class="hub-card-inner">
+            <div class="hub-card-bg" style="background-image: url('https://media.valorant-api.com/buddies/12a87bc3-4889-f538-2d33-bc8efd18be02/displayicon.png');"></div>
+            <div class="hub-card-content">
+              <span class="hub-badge">ACCESORIOS</span>
               <h3>Llaveros</h3>
-              <p>Accesorios para tus armas</p>
+              <p>Abalorios personalizados para tus armas</p>
             </div>
           </div>
         </div>
