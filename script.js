@@ -1,8 +1,6 @@
 const API_BASE = 'https://valorant-api.com/v1';
 const HENRIK_API_BASE = 'https://api.henrikdev.xyz/v1';
-
-// Tu API Key de HenrikDev configurada correctamente
-const HENRIK_API_KEY = 'HDEV-4e173a2c-d356-4427-b3da-9d3b84fcf466'; 
+const HENRIK_API_KEY = 'HDEV-4e173a2c-d356-4427-b3da-9d3b84fcf466';
 
 let currentData = [];
 let favorites = JSON.parse(localStorage.getItem('valorant_favs')) || [];
@@ -81,6 +79,18 @@ document.addEventListener('DOMContentLoaded', () => {
       showingFavsOnly = !showingFavsOnly;
       favFilterBtn.classList.toggle('active', showingFavsOnly);
       filterAndRender();
+    });
+  }
+
+  if (playerSearchToggleBtn) {
+    playerSearchToggleBtn.addEventListener('click', () => {
+      showingGlobalFavorites = false;
+      playerSearchToggleBtn.classList.toggle('active');
+      if (playerSearchToggleBtn.classList.contains('active')) {
+        renderPlayerSearchUI();
+      } else {
+        loadCategoryData();
+      }
     });
   }
 
@@ -185,12 +195,7 @@ async function loadCategoryData() {
   if (contentGrid) contentGrid.innerHTML = '<div class="skeleton-card"></div>'.repeat(8);
   if (subFilterBar) subFilterBar.innerHTML = '';
 
-  let apiEndpointCategory = currentCategory;
-  if (currentCategory === 'weapons') {
-    apiEndpointCategory = 'weapons/skins';
-  }
-
-  let endpoint = `${API_BASE}/${apiEndpointCategory}?language=${lang}`;
+  let endpoint = `${API_BASE}/${currentCategory}?language=${lang}`;
   if (currentCategory === 'agents') endpoint += '&isPlayableCharacter=true';
 
   try {
@@ -199,6 +204,10 @@ async function loadCategoryData() {
     currentData = result.data || [];
     currentData.forEach(item => { item._inferredCategory = currentCategory; });
 
+    if (currentCategory === 'weapons') {
+      setupWeaponSubFilters();
+    }
+
     filterAndRender();
   } catch (error) {
     console.error('Error al cargar datos:', error);
@@ -206,18 +215,35 @@ async function loadCategoryData() {
   }
 }
 
-// Función auxiliar lista para usar tu API key de HenrikDev cuando consultes jugadores/MMR
-async function fetchPlayerMmr(region, name, tag) {
+function setupWeaponSubFilters() {
+  if (!subFilterBar) return;
+  subFilterBar.innerHTML = `
+    <button class="sub-filter-btn active" onclick="filterWeaponsMain('all', this)">Armas Base</button>
+    <button class="sub-filter-btn" onclick="filterWeaponsMain('skins', this)">Todas las Skins</button>
+  `;
+}
+
+async function filterWeaponsMain(mode, btn) {
+  if (subFilterBar) {
+    subFilterBar.querySelectorAll('.sub-filter-btn').forEach(b => b.classList.remove('active'));
+  }
+  if (btn) btn.classList.add('active');
+  const lang = langSelect ? langSelect.value : 'es-ES';
+
+  if (contentGrid) contentGrid.innerHTML = '<div class="skeleton-card"></div>'.repeat(8);
+
   try {
-    const response = await fetch(`${HENRIK_API_BASE}/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`, {
-      headers: {
-        'Authorization': HENRIK_API_KEY
-      }
-    });
-    return await response.json();
+    let endpoint = `${API_BASE}/weapons?language=${lang}`;
+    if (mode === 'skins') {
+      endpoint = `${API_BASE}/weapons/skins?language=${lang}`;
+    }
+    const response = await fetch(endpoint);
+    const result = await response.json();
+    currentData = result.data || [];
+    currentData.forEach(item => { item._inferredCategory = 'weapons'; });
+    filterAndRender();
   } catch (err) {
-    console.error('Error al consultar HenrikDev MMR:', err);
-    return null;
+    console.error('Error filtrando armas:', err);
   }
 }
 
@@ -239,6 +265,10 @@ function setCatalogControlsVisible(visible) {
   if (langSelect) langSelect.style.display = display;
   if (searchInput && searchInput.parentElement) searchInput.parentElement.style.display = display;
   if (favFilterBtn) favFilterBtn.style.display = display;
+  if (playerSearchToggleBtn) {
+    playerSearchToggleBtn.style.display = display;
+    if (!visible) playerSearchToggleBtn.classList.remove('active');
+  }
 }
 
 function renderCards(items) {
@@ -251,11 +281,13 @@ function renderCards(items) {
   contentGrid.innerHTML = items.map(item => {
     const isFav = favorites.includes(item.uuid);
     const imgUrl = item.displayIcon || 
+                   item.fullRender || 
                    (item.chromas && item.chromas[0]?.displayIcon) || 
                    (item.levels && item.levels[0]?.displayIcon) || 
                    item.killStreamIcon;
     
-    const secondaryImgUrl = (item.chromas && item.chromas[1]?.displayIcon) || 
+    const secondaryImgUrl = item.fullPortrait || 
+                            (item.chromas && item.chromas[1]?.displayIcon) || 
                             (item.levels && item.levels[1]?.displayIcon) || '';
 
     return `
@@ -269,7 +301,7 @@ function renderCards(items) {
             ${secondaryImgUrl ? `<img src="${secondaryImgUrl}" class="card-img hover-img" alt="${item.displayName}" loading="lazy">` : ''}
           </div>
           <h3 class="card-title" onclick="openDetailModal('${item.uuid}')">${item.displayName || 'Sin Nombre'}</h3>
-          <span class="card-subtitle">${item.themeUuid ? 'Skin de Arma' : (item.developerName || currentCategory)}</span>
+          <span class="card-subtitle">${item.role ? item.role.displayName : (item.shopData ? 'Arma Principal' : currentCategory)}</span>
         </div>
       </div>
     `;
@@ -291,31 +323,147 @@ function openDetailModal(uuid) {
   const item = currentData.find(i => i.uuid === uuid);
   if (!item || !detailModal || !modalBody) return;
 
-  let mediaContent = '';
-  let videoSrc = item.streamedVideo || (item.levels && item.levels[0]?.streamedVideo);
-  
-  if (videoSrc) {
-    mediaContent = `
-      <div style="position:relative; width:100%; margin-bottom:15px; background:#000; border-radius:6px; overflow:hidden;">
-        <video controls autoplay muted style="width:100%; display:block; max-height: 320px;">
-          <source src="${videoSrc}" type="video/webm">
-          <source src="${videoSrc}" type="video/mp4">
-          Tu navegador no soporta reproducción de video.
-        </video>
-      </div>`;
+  let detailsHTML = '';
+
+  if (currentCategory === 'agents') {
+    const roleName = item.role ? item.role.displayName : 'Especialista';
+    const abilitiesHTML = item.abilities ? item.abilities.map(ab => `
+      <div style="display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; background: #0f1923; padding: 10px; border-radius: 6px;">
+        ${ab.displayIcon ? `<img src="${ab.displayIcon}" style="width: 36px; height: 36px; object-fit: contain;">` : ''}
+        <div>
+          <strong style="color: var(--accent-red); display: block; font-size: 14px;">${ab.displayName}</strong>
+          <span style="color: #bbb; font-size: 12px; line-height: 1.4;">${ab.description}</span>
+        </div>
+      </div>
+    `).join('') : '';
+
+    detailsHTML = `
+      <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;">
+        <div style="flex: 1; min-width: 250px; text-align: center; background: radial-gradient(circle, #2b3a4a 0%, #0f1923 80%); border-radius: 8px; padding: 15px;">
+          <img src="${item.fullPortrait || item.displayIcon}" style="max-height: 350px; object-fit: contain;">
+        </div>
+        <div style="flex: 2; min-width: 280px;">
+          <span style="background: var(--accent-red); color: #fff; padding: 3px 8px; font-size: 11px; font-weight: bold; border-radius: 4px; text-transform: uppercase;">${roleName}</span>
+          <h2 style="color: var(--text-main); margin: 8px 0 12px; font-size: 26px;">${item.displayName}</h2>
+          <p style="color: var(--text-dim); font-size: 14px; line-height: 1.5; margin-bottom: 20px;">${item.description}</p>
+          <h3 style="color: #fff; font-size: 16px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px;">Habilidades Tácticas</h3>
+          <div style="max-height: 220px; overflow-y: auto; padding-right: 5px;">${abilitiesHTML}</div>
+        </div>
+      </div>
+    `;
+  } else if (currentCategory === 'weapons' && item.shopData) {
+    // Es un arma base
+    const stats = item.weaponStats;
+    detailsHTML = `
+      <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+        <div style="flex: 1; text-align: center; background: #0f1923; padding: 20px; border-radius: 8px;">
+          <img src="${item.displayIcon}" style="max-width: 100%; object-fit: contain;">
+          <h2 style="color: #fff; margin-top: 15px;">${item.displayName}</h2>
+        </div>
+        <div style="flex: 1; color: #ccc; font-size: 13px;">
+          <p><strong>Costo en créditos:</strong> ${item.shopData.cost || 'Gratis'}</p>
+          <p><strong>Cadencia de fuego:</strong> ${stats ? stats.fireRate : 'N/A'}</p>
+          <p><strong>Tamaño del cargador:</strong> ${stats ? stats.magazineSize : 'N/A'}</p>
+        </div>
+      </div>
+    `;
   } else {
-    const mainModalImg = item.displayIcon || (item.chromas && item.chromas[0]?.displayIcon) || '';
-    if (mainModalImg) {
-      mediaContent = `<img src="${mainModalImg}" style="max-height: 250px; display: block; margin: 0 auto 15px; object-fit: contain;">`;
+    // Skin, Mapa, Tarjeta u otro objeto genérico
+    let mediaContent = '';
+    let videoSrc = item.streamedVideo || (item.levels && item.levels[0]?.streamedVideo);
+    
+    if (videoSrc) {
+      mediaContent = `
+        <div style="position:relative; width:100%; margin-bottom:15px; background:#000; border-radius:6px; overflow:hidden;">
+          <video controls autoplay muted style="width:100%; display:block; max-height: 320px;">
+            <source src="${videoSrc}" type="video/webm">
+            <source src="${videoSrc}" type="video/mp4">
+            Tu navegador no soporta reproducción de video.
+          </video>
+        </div>`;
+    } else {
+      const mainModalImg = item.displayIcon || item.fullRender || (item.chromas && item.chromas[0]?.displayIcon) || '';
+      if (mainModalImg) {
+        mediaContent = `<img src="${mainModalImg}" style="max-height: 250px; display: block; margin: 0 auto 15px; object-fit: contain;">`;
+      }
     }
+
+    detailsHTML = `
+      <h2 style="color:var(--text-main); margin-bottom: 10px;">${item.displayName}</h2>
+      ${mediaContent}
+      <p style="color:var(--text-dim); font-size: 14px; line-height: 1.5;">${item.description || 'Sin descripción detallada disponible para este objeto táctico.'}</p>
+    `;
   }
 
-  modalBody.innerHTML = `
-    <h2 style="color:var(--text-main); margin-bottom: 10px;">${item.displayName}</h2>
-    ${mediaContent}
-    <p style="color:var(--text-dim); font-size: 14px; line-height: 1.5;">${item.description || 'Sin descripción detallada disponible para este objeto táctico.'}</p>
-  `;
+  modalBody.innerHTML = detailsHTML;
   detailModal.style.display = 'flex';
+}
+
+// --- BUSCADOR DE JUGADORES (HENRIKDEV) ---
+
+async function renderPlayerSearchUI() {
+  if (!contentGrid) return;
+  contentGrid.innerHTML = `
+    <div style="grid-column: 1/-1; max-width: 600px; margin: 40px auto; background: #0f1923; padding: 30px; border-radius: 8px; border: 1px solid #ff4655;">
+      <h2 style="color: #fff; margin-bottom: 10px; text-align: center;">Buscador de Jugadores (Tracker)</h2>
+      <p style="color: #888; font-size: 13px; text-align: center; margin-bottom: 20px;">Consulta rangos, MMR y estadísticas competitivas en tiempo real.</p>
+      
+      <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+        <select id="playerRegion" class="styled-input" style="flex: 1; min-width: 120px;">
+          <option value="eu">EU (Europa)</option>
+          <option value="na">NA (Norteamérica)</option>
+          <option value="ap">AP (Asia-Pacífico)</option>
+          <option value="kr">KR (Corea)</option>
+        </select>
+        <input type="text" id="playerName" placeholder="Nombre (ej. TenZ)" class="styled-input" style="flex: 2;">
+        <input type="text" id="playerTag" placeholder="Tag (ej. 0001)" class="styled-input" style="flex: 1; min-width: 90px;">
+      </div>
+      <button onclick="executePlayerSearch()" class="action-icon-btn" style="width: 100%; background: var(--accent-red); color: #fff; border: none; padding: 12px; font-weight: bold; border-radius: 4px; cursor: pointer;">Buscar Jugador</button>
+      
+      <div id="playerSearchResultContainer" style="margin-top: 25px;"></div>
+    </div>
+  `;
+}
+
+async function executePlayerSearch() {
+  const region = document.getElementById('playerRegion').value;
+  const name = document.getElementById('playerName').value.trim();
+  const tag = document.getElementById('playerTag').value.trim();
+  const container = document.getElementById('playerSearchResultContainer');
+
+  if (!name || !tag) {
+    alert('Por favor introduce el nombre y el tag del jugador.');
+    return;
+  }
+
+  container.innerHTML = '<p style="text-align: center; color: #888;">Buscando datos del jugador...</p>';
+
+  try {
+    const response = await fetch(`${HENRIK_API_BASE}/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`, {
+      headers: { 'Authorization': HENRIK_API_KEY }
+    });
+    const result = await response.json();
+
+    if (result.status !== 200 || !result.data) {
+      container.innerHTML = '<p style="text-align: center; color: #ff4655;">Jugador no encontrado o error en la API.</p>';
+      return;
+    }
+
+    const data = result.data;
+    container.innerHTML = `
+      <div style="background: #182633; padding: 20px; border-radius: 6px; display: flex; align-items: center; gap: 20px;">
+        ${data.images?.large ? `<img src="${data.images.large}" style="width: 70px; height: 70px; object-fit: contain;">` : ''}
+        <div>
+          <h3 style="color: #fff; margin-bottom: 5px;">${name}#${tag}</h3>
+          <p style="color: #ff4655; font-size: 15px; font-weight: bold; margin-bottom: 3px;">${data.currenttierpatched || 'Sin Rango'}</p>
+          <p style="color: #bbb; font-size: 13px;">RR (Puntos): ${data.ranking_in_tier ?? 0} | MMR Change: ${data.mmr_change_to_last_game ?? 0}</p>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    console.error('Error buscando jugador:', err);
+    container.innerHTML = '<p style="text-align: center; color: #ff4655;">Error de conexión con el servicio de estadísticas.</p>';
+  }
 }
 
 // --- LOGICA DE AUTENTICACIÓN Y PERFIL LOCAL ---
