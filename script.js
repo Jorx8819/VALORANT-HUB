@@ -1,4 +1,8 @@
 const API_BASE = 'https://valorant-api.com/v1';
+const HENRIK_API_BASE = 'https://api.henrikdev.xyz/v1';
+
+// Tu API Key de HenrikDev configurada correctamente
+const HENRIK_API_KEY = 'HDEV-4e173a2c-d356-4427-b3da-9d3b84fcf466'; 
 
 let currentData = [];
 let favorites = JSON.parse(localStorage.getItem('valorant_favs')) || [];
@@ -181,7 +185,12 @@ async function loadCategoryData() {
   if (contentGrid) contentGrid.innerHTML = '<div class="skeleton-card"></div>'.repeat(8);
   if (subFilterBar) subFilterBar.innerHTML = '';
 
-  let endpoint = `${API_BASE}/${currentCategory}?language=${lang}`;
+  let apiEndpointCategory = currentCategory;
+  if (currentCategory === 'weapons') {
+    apiEndpointCategory = 'weapons/skins';
+  }
+
+  let endpoint = `${API_BASE}/${apiEndpointCategory}?language=${lang}`;
   if (currentCategory === 'agents') endpoint += '&isPlayableCharacter=true';
 
   try {
@@ -194,6 +203,21 @@ async function loadCategoryData() {
   } catch (error) {
     console.error('Error al cargar datos:', error);
     if (contentGrid) contentGrid.innerHTML = '<p>Error al cargar el contenido.</p>';
+  }
+}
+
+// Función auxiliar lista para usar tu API key de HenrikDev cuando consultes jugadores/MMR
+async function fetchPlayerMmr(region, name, tag) {
+  try {
+    const response = await fetch(`${HENRIK_API_BASE}/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`, {
+      headers: {
+        'Authorization': HENRIK_API_KEY
+      }
+    });
+    return await response.json();
+  } catch (err) {
+    console.error('Error al consultar HenrikDev MMR:', err);
+    return null;
   }
 }
 
@@ -226,8 +250,14 @@ function renderCards(items) {
 
   contentGrid.innerHTML = items.map(item => {
     const isFav = favorites.includes(item.uuid);
-    const imgUrl = item.displayIcon || item.killStreamIcon || (item.levels && item.levels[0]?.displayIcon);
+    const imgUrl = item.displayIcon || 
+                   (item.chromas && item.chromas[0]?.displayIcon) || 
+                   (item.levels && item.levels[0]?.displayIcon) || 
+                   item.killStreamIcon;
     
+    const secondaryImgUrl = (item.chromas && item.chromas[1]?.displayIcon) || 
+                            (item.levels && item.levels[1]?.displayIcon) || '';
+
     return `
       <div class="card-wrapper">
         <div class="card">
@@ -236,9 +266,10 @@ function renderCards(items) {
           </div>
           <div class="card-img-container" onclick="openDetailModal('${item.uuid}')">
             ${imgUrl ? `<img src="${imgUrl}" class="card-img primary-img" alt="${item.displayName}" loading="lazy">` : ''}
+            ${secondaryImgUrl ? `<img src="${secondaryImgUrl}" class="card-img hover-img" alt="${item.displayName}" loading="lazy">` : ''}
           </div>
           <h3 class="card-title" onclick="openDetailModal('${item.uuid}')">${item.displayName || 'Sin Nombre'}</h3>
-          <span class="card-subtitle">${item.developerName || currentCategory}</span>
+          <span class="card-subtitle">${item.themeUuid ? 'Skin de Arma' : (item.developerName || currentCategory)}</span>
         </div>
       </div>
     `;
@@ -261,16 +292,28 @@ function openDetailModal(uuid) {
   if (!item || !detailModal || !modalBody) return;
 
   let mediaContent = '';
-  if (item.streamedVideo) {
-    mediaContent = `<video controls autoplay style="width:100%; border-radius:6px; margin-bottom:15px;"><source src="${item.streamedVideo}" type="video/webm">Tu navegador no soporta video.</video>`;
-  } else if (item.displayIcon) {
-    mediaContent = `<img src="${item.displayIcon}" style="max-height: 250px; display: block; margin: 0 auto 15px; object-fit: contain;">`;
+  let videoSrc = item.streamedVideo || (item.levels && item.levels[0]?.streamedVideo);
+  
+  if (videoSrc) {
+    mediaContent = `
+      <div style="position:relative; width:100%; margin-bottom:15px; background:#000; border-radius:6px; overflow:hidden;">
+        <video controls autoplay muted style="width:100%; display:block; max-height: 320px;">
+          <source src="${videoSrc}" type="video/webm">
+          <source src="${videoSrc}" type="video/mp4">
+          Tu navegador no soporta reproducción de video.
+        </video>
+      </div>`;
+  } else {
+    const mainModalImg = item.displayIcon || (item.chromas && item.chromas[0]?.displayIcon) || '';
+    if (mainModalImg) {
+      mediaContent = `<img src="${mainModalImg}" style="max-height: 250px; display: block; margin: 0 auto 15px; object-fit: contain;">`;
+    }
   }
 
   modalBody.innerHTML = `
     <h2 style="color:var(--text-main); margin-bottom: 10px;">${item.displayName}</h2>
     ${mediaContent}
-    <p style="color:var(--text-dim); font-size: 14px; line-height: 1.5;">${item.description || 'Sin descripción detallada disponible.'}</p>
+    <p style="color:var(--text-dim); font-size: 14px; line-height: 1.5;">${item.description || 'Sin descripción detallada disponible para este objeto táctico.'}</p>
   `;
   detailModal.style.display = 'flex';
 }
