@@ -1,4 +1,234 @@
+/* ==========================================================================
+   VALORANT HUB - ESTILOS GLOBALES Y DE DISEÑO
+   ========================================================================== */
+
 :root {
+  --bg-primary: #0f1923;
+  --bg-secondary: #16222f;
+  --accent-red: #ff4655;
+  --accent-cyan: #00ecec;
+  --text-main: #ffffff;
+  --text-muted: #8b9bb4;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Fondo animado sutil con líneas de escaneo (Estilo HUD de Valorant) */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: 
+    linear-gradient(rgba(15, 25, 35, 0.85), rgba(10, 15, 22, 0.95)),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 236, 236, 0.015) 2px, rgba(0, 236, 236, 0.015) 4px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes valorantScanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(1000%); }
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 5px;
+  background: linear-gradient(90deg, transparent, rgba(255, 70, 85, 0.4), transparent);
+  animation: valorantScanline 8s linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ==========================================================================
+   ESTILOS DEL MAIN HUB (PANTALLA DE INICIO)
+   ========================================================================== */
+
+.main-hub-container {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 10px 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.hub-header-title {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.hub-header-title h1 {
+  color: var(--text-main);
+  font-size: 32px;
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  text-shadow: 0 0 15px rgba(255, 70, 85, 0.4);
+}
+
+.hub-header-title p {
+  color: var(--text-muted);
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, auto);
+  gap: 25px;
+  width: 100%;
+}
+
+/* Tarjetas Tácticas Limpias Estilo Valorant HUD */
+.hub-card {
+  position: relative;
+  height: 190px;
+  background: linear-gradient(135deg, #0f1923 0%, #16222f 100%);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Patrón de puntos geométrico elegante y fijo */
+.hub-card-bg {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-image: radial-gradient(rgba(0, 236, 236, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+}
+
+/* Línea láser superior que aparece al hacer hover */
+.hub-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0%;
+  height: 3px;
+  background: var(--accent-red);
+  box-shadow: 0 0 10px var(--accent-red);
+  transition: width 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  z-index: 3;
+}
+
+/* Esquina táctica inferior derecha decorativa */
+.hub-card::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+  border-right: 2px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease;
+  z-index: 3;
+}
+
+.hub-card-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hub-badge {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  background: rgba(0, 236, 236, 0.08);
+  padding: 2px 8px;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.hub-card-content h3 {
+  color: var(--text-main);
+  font-size: 24px;
+  margin-bottom: 6px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  transition: color 0.3s ease;
+}
+
+.hub-card-content p {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 0;
+  max-width: 220px;
+}
+
+/* Efecto Hover Profesional y Fino */
+.hub-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 70, 85, 0.5);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(255, 70, 85, 0.05);
+  background: linear-gradient(135deg, #131f2b 0%, #1a2a3a 100%);
+}
+
+.hub-card:hover::before {
+  width: 100%;
+}
+
+.hub-card:hover::after {
+  border-color: var(--accent-red);
+  box-shadow: 2px 2px 8px rgba(255, 70, 85, 0.4);
+}
+
+.hub-card:hover .hub-card-bg {
+  opacity: 0.8;
+  background-image: radial-gradient(rgba(255, 70, 85, 0.15) 1px, transparent 1px);
+}
+
+.hub-card:hover h3 {
+  color: var(--accent-red);
+  text-shadow: 0 0 12px rgba(255, 70, 85, 0.4);
+}
+
+.hub-card:hover .hub-badge {
+  color: var(--accent-red);
+  background: rgba(255, 70, 85, 0.15);
+}
+
+/* Responsivo para móviles y tablets */
+@media (max-width: 900px) {
+  .hub-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .hub-grid {
+    grid-template-columns: 1fr;
+  }
+}:root {
   --bg-main: #0f1923;
   --bg-card: #1f2326;
   --accent-red: #ff4655;
