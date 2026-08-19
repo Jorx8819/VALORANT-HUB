@@ -21,7 +21,6 @@ let loggedUserEmail = '';
 let loggedRiotName = '';
 let loggedRiotTag = '';
 let loggedRegion = 'eu';
-let searchHistory = JSON.parse(localStorage.getItem('valorant_search_history')) || [];
 
 const categorySelect = document.getElementById('categorySelect');
 const langSelect = document.getElementById('langSelect');
@@ -184,14 +183,6 @@ function switchAuthTab(tab, event) {
           <button onclick="openGlobalFavoritesDashboard()" class="role-btn" style="width: 100%; padding: 6px; font-size: 12px;">Ver Todos Mis Favoritos</button>
         </div>
 
-        <div style="background: #111e2e; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); text-align: left;">
-          <h4 style="margin-bottom: 6px; color: #fff; font-size: 13px;">Búsquedas Recientes (${searchHistory.length})</h4>
-          <div style="max-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
-            ${searchHistory.length === 0 ? '<p style="font-size: 11px; color: #888;">Sin búsquedas recientes.</p>' : 
-              searchHistory.map(s => `<button onclick="quickSearchPlayer('${s.name}', '${s.tag}', '${s.region}')" style="background: #0f1923; border: none; color: #ccc; font-size: 11px; padding: 4px; text-align: left; cursor: pointer; border-radius: 4px;">${s.name}#${s.tag} (${s.region.toUpperCase()})</button>`).join('')}
-          </div>
-        </div>
-
         <button onclick="handleLogout()" class="level-btn" style="background: var(--accent-red); color: #fff; width: 100%; padding: 8px; font-size: 13px;">Cerrar Sesión</button>
       </div>
     `;
@@ -212,8 +203,8 @@ function switchAuthTab(tab, event) {
         <input type="email" id="regEmail" placeholder="Correo electrónico" required class="styled-input" />
         <input type="password" id="regPassword" placeholder="Contraseña" required class="styled-input" />
         <div style="display: flex; gap: 6px;">
-          <input type="text" id="regRiotName" placeholder="Riot Name (ej. Player)" required class="styled-input" style="flex:2;" />
-          <input type="text" id="regRiotTag" placeholder="Tag (ej. 1234)" required class="styled-input" style="flex:1;" />
+          <input type="text" id="regRiotName" placeholder="Riot Name (ej. Jorx)" required class="styled-input" style="flex:2;" />
+          <input type="text" id="regRiotTag" placeholder="Tag (ej. 8819)" required class="styled-input" style="flex:1;" />
         </div>
         <select id="regRegion" class="styled-select" style="width: 100%;">
           ${VALORANT_REGIONS.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
@@ -259,8 +250,8 @@ async function openGlobalFavoritesDashboard() {
 
 function handleRegister(e) {
   e.preventDefault();
-  const email = document.getElementById('regEmail').value;
   const username = document.getElementById('regUsername').value;
+  const email = document.getElementById('regEmail').value;
   const riotName = document.getElementById('regRiotName').value.trim();
   const riotTag = document.getElementById('regRiotTag').value.trim().replace('#', '');
   const region = document.getElementById('regRegion').value;
@@ -273,8 +264,11 @@ function handleRegister(e) {
 
   const btnText = document.getElementById('authButtonText');
   if (btnText) btnText.textContent = username;
-  alert(`¡Cuenta creada con éxito, ${username}! Riot ID vinculado.`);
+  
   if (authModal) authModal.style.display = 'none';
+  
+  // Cargar automáticamente sus estadísticas de Riot al registrarse
+  fetchPlayerData(loggedRiotName, loggedRiotTag, loggedRegion);
 }
 
 function handleLogin(e) {
@@ -282,15 +276,19 @@ function handleLogin(e) {
   const email = document.getElementById('loginEmail').value;
   isLoggedIn = true;
   loggedUserEmail = email;
-  // Valores por defecto simulados si inicia sesión de forma rápida
-  loggedRiotName = loggedRiotName || 'Player';
-  loggedRiotTag = loggedRiotTag || '1234';
+  
+  // Si no se han definido antes, usamos unos por defecto o los que tuviera guardados
+  loggedRiotName = loggedRiotName || 'Jorx';
+  loggedRiotTag = loggedRiotTag || '8819';
   loggedRegion = loggedRegion || 'eu';
 
   const btnText = document.getElementById('authButtonText');
   if (btnText) btnText.textContent = email.split('@')[0];
-  alert('¡Bienvenido de nuevo!');
+  
   if (authModal) authModal.style.display = 'none';
+
+  // Cargar automáticamente sus estadísticas de Riot al iniciar sesión
+  fetchPlayerData(loggedRiotName, loggedRiotTag, loggedRegion);
 }
 
 function handleLogout() {
@@ -708,8 +706,8 @@ function renderPlayerSearchForm() {
   if (!subFilterBar) return;
   subFilterBar.innerHTML = `
     <div class="player-search-bar" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;">
-      <input type="text" id="playerGameName" placeholder="Nombre (ej. Mixwell)" class="styled-input" />
-      <input type="text" id="playerTagLine" placeholder="Tag (ej. 1234)" class="styled-input" />
+      <input type="text" id="playerGameName" placeholder="Nombre (ej. Jorx)" class="styled-input" />
+      <input type="text" id="playerTagLine" placeholder="Tag (ej. 8819)" class="styled-input" />
       <select id="playerRegion" class="styled-select">
         ${VALORANT_REGIONS.map(r => `<option value="${r.value}" ${r.value === loggedRegion ? 'selected' : ''}>${r.label}</option>`).join('')}
       </select>
@@ -730,13 +728,6 @@ async function fetchPlayerData(customName, customTag, customRegion) {
   if (!name || !tag) { 
     alert('Ingresa nombre y tag.'); 
     return; 
-  }
-
-  // Guardar en historial de búsquedas recientes
-  if (!searchHistory.some(s => s.name.toLowerCase() === name.toLowerCase() && s.tag === tag)) {
-    searchHistory.unshift({ name, tag, region });
-    if (searchHistory.length > 5) searchHistory.pop();
-    localStorage.setItem('valorant_search_history', JSON.stringify(searchHistory));
   }
 
   if (viewMode !== 'player' && playerSearchToggleBtn) {
@@ -860,9 +851,4 @@ function loadMyOwnStats() {
   }
   if (authModal) authModal.style.display = 'none';
   fetchPlayerData(loggedRiotName, loggedRiotTag, loggedRegion);
-}
-
-function quickSearchPlayer(name, tag, region) {
-  if (authModal) authModal.style.display = 'none';
-  fetchPlayerData(name, tag, region);
 }
