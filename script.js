@@ -680,7 +680,7 @@ async function fetchPlayerData() {
     return; 
   }
 
-  contentGrid.innerHTML = `<div class="player-empty-state" style="grid-column: 1/-1; text-align: center;"><p>Buscando datos de <strong>${name}#${tag}</strong>...</p></div>`;
+  contentGrid.innerHTML = `<div class="player-empty-state" style="grid-column: 1/-1; text-align: center;"><p>Buscando toda la información de <strong>${name}#${tag}</strong>...</p></div>`;
   
   try {
     const headers = {};
@@ -688,28 +688,110 @@ async function fetchPlayerData() {
       headers['Authorization'] = HENRIK_API_KEY;
     }
 
-    const url = `https://api.henrikdev.xyz/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
-    const res = await fetch(url, { headers });
-    const data = await res.json();
+    // Peticiones simultáneas para obtener cuenta, rango (MMR) y últimas partidas
+    const accountUrl = `https://api.henrikdev.xyz/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+    const mmrUrl = `https://api.henrikdev.xyz/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+    const matchesUrl = `https://api.henrikdev.xyz/valorant/v3/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
 
-    if (!res.ok || data.status !== 200) {
-      throw new Error(data.message || 'Jugador no encontrado o error en la API');
+    const [accRes, mmrRes, matchRes] = await Promise.all([
+      fetch(accountUrl, { headers }).then(r => r.json()).catch(() => null),
+      fetch(mmrUrl, { headers }).then(r => r.json()).catch(() => null),
+      fetch(matchesUrl, { headers }).then(r => r.json()).catch(() => null)
+    ]);
+
+    if (!accRes || accRes.status !== 200) {
+      throw new Error(accRes?.message || 'No se pudo encontrar la cuenta del jugador.');
     }
 
-    const player = data.data;
+    const player = accRes.data;
+    const mmrData = mmrRes && mmrRes.status === 200 ? mmrRes.data : null;
+    const matchesData = matchRes && matchRes.status === 200 ? matchRes.data : [];
+
+    // Extraer datos de rango
+    const currentTier = mmrData?.current_data?.currenttierpatched || 'Sin rango / No colocado';
+    const rankingInTier = mmrData?.current_data?.ranking_in_tier ?? 0;
+    const mmrChangeToLastGame = mmrData?.current_data?.mmr_change_to_last_game ?? 0;
+    const elo = mmrData?.current_data?.elo ?? 'Oculto';
+    const rankIcon = mmrData?.current_data?.images?.small || '';
+
+    // Renderizar perfil completo enriquecido
     contentGrid.innerHTML = `
-      <div class="player-profile-card" style="grid-column: 1/-1; background: #111e2e; padding: 25px; border-radius: 8px; border: 1px solid var(--accent-red); text-align: center;">
-        <img src="${player.card.large || player.card.small}" alt="Player Card" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 15px; border: 2px solid var(--accent-red);" />
-        <h2 style="color: #fff; margin-bottom: 5px;">${player.name} <span style="color: #888; font-size: 16px;">#${player.tag}</span></h2>
-        <p style="color: var(--accent-red); font-weight: bold; margin-bottom: 15px;">Nivel de Cuenta: ${player.account_level}</p>
-        <p style="color: #aaa; font-size: 13px;">Región: ${player.region.toUpperCase()} | Última actualización: ${new Date(player.last_update).toLocaleDateString()}</p>
+      <div class="player-profile-container" style="grid-column: 1/-1; display: flex; flex-direction: column; gap: 20px;">
+        
+        <!-- Tarjeta Principal de Identidad -->
+        <div class="player-profile-card" style="background: #111e2e; padding: 25px; border-radius: 8px; border: 1px solid var(--accent-red); display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: center; text-align: center;">
+          <img src="${player.card.large || player.card.small}" alt="Player Card" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-red);" />
+          <div>
+            <h2 style="color: #fff; margin-bottom: 5px; font-size: 24px;">${player.name} <span style="color: #888; font-size: 18px;">#${player.tag}</span></h2>
+            <p style="color: var(--accent-red); font-weight: bold; margin-bottom: 5px;">Nivel de Cuenta: ${player.account_level}</p>
+            <p style="color: #aaa; font-size: 13px;">Región: ${player.region.toUpperCase()} | Último cambio de nombre: ${player.last_update || 'N/A'}</p>
+          </div>
+        </div>
+
+        <!-- Sección de Rango y Elo Actual -->
+        <div style="background: #111e2e; padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap; gap: 15px; text-align: center;">
+          ${rankIcon ? `<img src="${rankIcon}" alt="Rank Icon" style="height: 70px;" />` : ''}
+          <div>
+            <p style="font-size: 13px; color: #888;">Rango Actual</p>
+            <h3 style="color: #fff; font-size: 20px; margin-top: 4px;">${currentTier}</h3>
+          </div>
+          <div>
+            <p style="font-size: 13px; color: #888;">Puntos de Rango (RR)</p>
+            <p style="color: var(--accent-red); font-size: 18px; font-weight: bold; margin-top: 4px;">${rankingInTier} RR</p>
+          </div>
+          <div>
+            <p style="font-size: 13px; color: #888;">Elo Total</p>
+            <p style="color: #fff; font-size: 18px; font-weight: bold; margin-top: 4px;">${elo}</p>
+          </div>
+          <div>
+            <p style="font-size: 13px; color: #888;">Último Cambio RR</p>
+            <p style="color: ${mmrChangeToLastGame >= 0 ? '#2ecc71' : '#ff4655'}; font-size: 18px; font-weight: bold; margin-top: 4px;">${mmrChangeToLastGame > 0 ? '+' : ''}${mmrChangeToLastGame}</p>
+          </div>
+        </div>
+
+        <!-- Historial Reciente de Partidas -->
+        <div style="background: #111e2e; padding: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <h3 style="margin-bottom: 15px; color: #fff; font-size: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Últimas Partidas Registradas</h3>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            ${matchesData.length === 0 ? '<p style="color: #888; text-align: center;">No hay partidas recientes públicas disponibles.</p>' : 
+              matchesData.slice(0, 5).map(match => {
+                const meta = match.metadata || {};
+                const playersList = match.players?.all_players || [];
+                const me = playersList.find(p => p.puuid === player.puuid || p.name.toLowerCase() === player.name.toLowerCase());
+                const mode = meta.mode || 'Partida';
+                const mapName = meta.map || 'Desconocido';
+                const team = me?.team?.toLowerCase();
+                const redWon = match.teams?.red?.has_won;
+                const blueWon = match.teams?.blue?.has_won;
+                let won = false;
+                if (team === 'red') won = redWon;
+                if (team === 'blue') won = blueWon;
+                
+                return `
+                  <div style="display: flex; justify-content: space-between; align-items: center; background: #0f1923; padding: 12px 15px; border-radius: 6px; border-left: 4px solid ${won ? '#2ecc71' : '#ff4655'}; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                      <strong style="color: #fff; font-size: 14px;">${mode}</strong> - <span style="color: #aaa; font-size: 13px;">${mapName}</span>
+                      <p style="font-size: 11px; color: #777; margin-top: 2px;">${meta.game_start_patched || ''}</p>
+                    </div>
+                    <div style="display: flex; gap: 20px; align-items: center; font-size: 13px;">
+                      <div>Agente: <strong style="color: #fff;">${me?.character || 'N/A'}</strong></div>
+                      <div>K/D/A: <strong style="color: #fff;">${me?.stats?.kills || 0}/${me?.stats?.deaths || 0}/${me?.stats?.assists || 0}</strong></div>
+                      <div style="font-weight: bold; color: ${won ? '#2ecc71' : '#ff4655'};">${won ? 'VICTORIA' : 'DERROTA'}</div>
+                    </div>
+                  </div>
+                `;
+              }).join('')
+            }
+          </div>
+        </div>
+
       </div>
     `;
 
   } catch (err) {
     contentGrid.innerHTML = `
       <div class="player-error-state" style="grid-column: 1/-1; text-align: center; color: var(--accent-red);">
-        <p><strong>Error al buscar jugador:</strong> ${err.message}</p>
+        <p><strong>Error al consultar la información completa del jugador:</strong> ${err.message}</p>
       </div>
     `;
   }
