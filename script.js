@@ -1,14 +1,4 @@
 const API_BASE = 'https://valorant-api.com/v1';
-const HENRIK_API_KEY = 'HDEV-4e173a2c-d356-4427-b3da-9d3b84fcf466';
-
-const VALORANT_REGIONS = [
-  { value: 'eu', label: 'Europa' },
-  { value: 'na', label: 'Norteamérica' },
-  { value: 'latam', label: 'Latinoamérica' },
-  { value: 'br', label: 'Brasil' },
-  { value: 'ap', label: 'Asia-Pacífico' },
-  { value: 'kr', label: 'Corea' },
-];
 
 let currentData = [];
 let favorites = JSON.parse(localStorage.getItem('valorant_favs')) || [];
@@ -17,12 +7,8 @@ let playerCompareList = [];
 let showingFavsOnly = false;
 let showingGlobalFavorites = false;
 let viewMode = 'hub'; 
-let currentCategory = 'agents'; // Guardamos la categoría activa actual
+let currentCategory = 'agents'; 
 let isLoggedIn = false;
-let loggedUserEmail = '';
-let loggedRiotName = '';
-let loggedRiotTag = '';
-let loggedRegion = 'eu';
 
 const langSelect = document.getElementById('langSelect');
 const searchInput = document.getElementById('searchInput');
@@ -65,7 +51,6 @@ function shutdownCompareModal() {
   if (compareModalBody) compareModalBody.innerHTML = '';
 }
 
-// Volver al Hub principal de 2 filas x 3 columnas centrado
 function returnToCatalog() {
   showingGlobalFavorites = false;
   showingFavsOnly = false;
@@ -78,7 +63,6 @@ function returnToCatalog() {
 
 document.addEventListener('DOMContentLoaded', () => {
   showMainHub();
-  switchAuthTab('profile');
   
   if (langSelect) langSelect.addEventListener('change', loadCategoryData);
   if (searchInput) searchInput.addEventListener('input', filterAndRender);
@@ -92,35 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (playerSearchToggleBtn) {
-    playerSearchToggleBtn.addEventListener('click', () => {
-      if (!isLoggedIn) {
-        alert('Debes iniciar sesión para acceder al buscador de estadísticas de jugadores.');
-        switchAuthTab('login');
-        if (authModal) authModal.style.display = 'flex';
-        return;
-      }
-
-      showingGlobalFavorites = false;
-      viewMode = viewMode === 'player' ? 'catalog' : 'player';
-      playerSearchToggleBtn.classList.toggle('active', viewMode === 'player');
-      setCatalogControlsVisible(viewMode === 'catalog');
-      
-      if (viewMode === 'player') {
-        renderPlayerSearchForm();
-        updatePlayerCompareBar();
-        if (contentGrid) contentGrid.innerHTML = '<div class="player-empty-state"><p>Introduce el nombre y etiqueta para buscar estadísticas.</p></div>';
-      } else {
-        if (compareFloatingBar) compareFloatingBar.style.display = 'none';
-        if (subFilterBar) subFilterBar.innerHTML = '';
-        loadCategoryData();
-      }
-    });
-  }
-
   if (openAuthModalBtn) {
     openAuthModalBtn.addEventListener('click', () => {
-      switchAuthTab('profile');
       if (authModal) authModal.style.display = 'flex';
     });
   }
@@ -134,32 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === compareModal) shutdownCompareModal();
     if (e.target === authModal) authModal.style.display = 'none';
   });
-
-  if (openCompareBtn) {
-    openCompareBtn.addEventListener('click', () => {
-      if (viewMode === 'player') {
-        openPlayerCompareModalView();
-      } else {
-        openCompareModalView();
-      }
-    });
-  }
-
-  if (clearCompareBtn) {
-    clearCompareBtn.addEventListener('click', () => {
-      if (viewMode === 'player') {
-        playerCompareList = [];
-        updatePlayerCompareBar();
-      } else {
-        compareList = [];
-        updateCompareBar();
-        filterAndRender();
-      }
-    });
-  }
 });
 
-// Muestra el Hub de las 6 tarjetas de forma simétrica (3x2) y oculta el contenido secundario
 function showMainHub() {
   viewMode = 'hub';
   setCatalogControlsVisible(false);
@@ -176,7 +109,6 @@ function showMainHub() {
         
         <div class="hub-grid">
           <div class="hub-card" onclick="selectHubSection('agents')">
-            <div class="hub-card-bg"></div>
             <div class="hub-card-content">
               <span class="hub-badge">ROLES Y PODERES</span>
               <h3>Agentes</h3>
@@ -185,7 +117,6 @@ function showMainHub() {
           </div>
 
           <div class="hub-card" onclick="selectHubSection('weapons')">
-            <div class="hub-card-bg"></div>
             <div class="hub-card-content">
               <span class="hub-badge">ARSENAL</span>
               <h3>Armas y Skins</h3>
@@ -194,7 +125,6 @@ function showMainHub() {
           </div>
 
           <div class="hub-card" onclick="selectHubSection('maps')">
-            <div class="hub-card-bg"></div>
             <div class="hub-card-content">
               <span class="hub-badge">UBICACIONES</span>
               <h3>Mapas</h3>
@@ -203,7 +133,6 @@ function showMainHub() {
           </div>
 
           <div class="hub-card" onclick="selectHubSection('playercards')">
-            <div class="hub-card-bg"></div>
             <div class="hub-card-content">
               <span class="hub-badge">COLECCIONABLES</span>
               <h3>Tarjetas</h3>
@@ -212,7 +141,6 @@ function showMainHub() {
           </div>
 
           <div class="hub-card" onclick="selectHubSection('sprays')">
-            <div class="hub-card-bg"></div>
             <div class="hub-card-content">
               <span class="hub-badge">EXPRESIÓN</span>
               <h3>Graffitis</h3>
@@ -221,7 +149,6 @@ function showMainHub() {
           </div>
 
           <div class="hub-card" onclick="selectHubSection('buddies')">
-            <div class="hub-card-bg"></div>
             <div class="hub-card-content">
               <span class="hub-badge">ACCESORIOS</span>
               <h3>Llaveros</h3>
@@ -238,7 +165,6 @@ function selectHubSection(categoryName) {
   viewMode = 'catalog';
   currentCategory = categoryName;
   compareList = [];
-  updateCompareBar();
   setCatalogControlsVisible(true);
   loadCategoryData();
 }
@@ -259,7 +185,6 @@ async function loadCategoryData() {
     currentData = result.data || [];
     currentData.forEach(item => { item._inferredCategory = currentCategory; });
 
-    renderSubFilters(currentCategory);
     filterAndRender();
   } catch (error) {
     console.error('Error al cargar datos:', error);
@@ -277,7 +202,7 @@ function filterAndRender() {
     return nameMatches && favMatches;
   });
 
-  renderCards(filtered, currentCategory);
+  renderCards(filtered);
 }
 
 function setCatalogControlsVisible(visible) {
@@ -287,4 +212,80 @@ function setCatalogControlsVisible(visible) {
   if (favFilterBtn) favFilterBtn.style.display = display;
 }
 
-// (Resto de tus funciones auxiliares, modales, renderCards y perfiles de jugadores se mantienen exactamente igual que en tu script original).
+function renderCards(items) {
+  if (!contentGrid) return;
+  if (items.length === 0) {
+    contentGrid.innerHTML = '<p style="text-align: center; grid-column: 1/-1; color: #888;">No se encontraron elementos.</p>';
+    return;
+  }
+
+  contentGrid.innerHTML = items.map(item => {
+    const isFav = favorites.includes(item.uuid);
+    const imgUrl = item.displayIcon || item.killStreamIcon || (item.levels && item.levels[0]?.displayIcon);
+    
+    return `
+      <div class="card-wrapper">
+        <div class="card">
+          <div class="card-action-btns">
+            <button class="card-btn ${isFav ? 'is-fav' : ''}" onclick="toggleFavorite('${item.uuid}')">♥</button>
+          </div>
+          <div class="card-img-container" onclick="openDetailModal('${item.uuid}')">
+            ${imgUrl ? `<img src="${imgUrl}" class="card-img primary-img" alt="${item.displayName}" loading="lazy">` : ''}
+          </div>
+          <h3 class="card-title" onclick="openDetailModal('${item.uuid}')">${item.displayName || 'Sin Nombre'}</h3>
+          <span class="card-subtitle">${item.developerName || currentCategory}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleFavorite(uuid) {
+  const index = favorites.indexOf(uuid);
+  if (index > -1) {
+    favorites.splice(index, 1);
+  } else {
+    favorites.push(uuid);
+  }
+  localStorage.setItem('valorant_favs', JSON.stringify(favorites));
+  filterAndRender();
+}
+
+function openDetailModal(uuid) {
+  const item = currentData.find(i => i.uuid === uuid);
+  if (!item || !detailModal || !modalBody) return;
+
+  let mediaContent = '';
+  if (item.streamedVideo) {
+    mediaContent = `<video controls autoplay style="width:100%; border-radius:6px; margin-bottom:15px;"><source src="${item.streamedVideo}" type="video/webm">Tu navegador no soporta video.</video>`;
+  } else if (item.displayIcon) {
+    mediaContent = `<img src="${item.displayIcon}" style="max-height: 250px; display: block; margin: 0 auto 15px; object-fit: contain;">`;
+  }
+
+  modalBody.innerHTML = `
+    <h2 style="color:var(--text-main); margin-bottom: 10px;">${item.displayName}</h2>
+    ${mediaContent}
+    <p style="color:var(--text-dim); font-size: 14px; line-height: 1.5;">${item.description || 'Sin descripción detallada disponible.'}</p>
+  `;
+  detailModal.style.display = 'flex';
+}
+
+function switchAuthTab(tab) {
+  const container = document.getElementById('authFormContainer');
+  if (!container) return;
+  if (tab === 'profile') {
+    container.innerHTML = `<p style="color:#ccc; text-align:center;">Inicia sesión para guardar tu progreso y gestionar agentes favoritos.</p>`;
+  } else if (tab === 'login') {
+    container.innerHTML = `
+      <input type="email" placeholder="Correo electrónico" class="styled-input">
+      <input type="password" placeholder="Contraseña" class="styled-input">
+      <button class="action-icon-btn" style="width:100%; text-align:center; background:var(--accent-red); color:#fff; border:none; margin-top:10px;">Entrar</button>
+    `;
+  } else if (tab === 'register') {
+    container.innerHTML = `
+      <input type="email" placeholder="Correo electrónico" class="styled-input">
+      <input type="password" placeholder="Contraseña" class="styled-input">
+      <button class="action-icon-btn" style="width:100%; text-align:center; background:var(--accent-red); color:#fff; border:none; margin-top:10px;">Registrarse</button>
+    `;
+  }
+}

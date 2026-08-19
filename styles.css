@@ -106,20 +106,37 @@ body {
 }
 
 /* --- ESTILOS DEL HUB: 2 FILAS DE 3 TARJETAS CENTRADAS --- */
-.hub-container {
-  padding: 40px 20px;
-  background-color: var(--bg-main);
+.main-hub-container {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   width: 100%;
+  padding: 30px 10px;
+}
+
+.hub-header-title {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.hub-header-title h1 {
+  font-size: 26px;
+  letter-spacing: 2px;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+
+.hub-header-title p {
+  color: #888;
+  font-size: 13px;
 }
 
 .hub-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(260px, 320px));
+  grid-template-columns: repeat(3, minmax(260px, 310px));
   gap: 25px;
   width: 100%;
-  max-width: 1050px;
+  max-width: 1000px;
   justify-content: center;
 }
 
@@ -154,6 +171,15 @@ body {
 
 .hub-card:hover::before {
   opacity: 1;
+}
+
+.hub-badge {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--accent-red);
+  font-weight: bold;
+  display: block;
+  margin-bottom: 8px;
 }
 
 .hub-card-content h3 {
@@ -201,7 +227,7 @@ body {
 
 .card-wrapper:hover .card {
   border-color: var(--accent-red);
-  transform: rotateX(10deg) rotateY(-8deg);
+  transform: rotateX(8deg) rotateY(-6deg);
 }
 
 .card-bg {
@@ -243,7 +269,7 @@ body {
 .hover-img { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.85); opacity: 0; z-index: 5; pointer-events: none; }
 
 .card:hover .primary-img { opacity: 0; }
-.card:hover .hover-img { opacity: 1; transform: translate(-50%, -50%) scale(1.25); }
+.card:hover .hover-img { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
 
 .card-title { font-size: 16px; cursor: pointer; color: var(--text-main); }
 .card-subtitle { font-size: 12px; color: #888; margin-top: 4px; }
@@ -301,6 +327,8 @@ body {
 .styled-input {
   background: #0f1923; border: 1px solid var(--border-color);
   color: #fff; padding: 10px 14px; border-radius: 4px; font-size: 14px;
+  width: 100%;
+  margin-bottom: 12px;
 }
 
 .styled-input:focus {
