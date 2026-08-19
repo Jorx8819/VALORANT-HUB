@@ -64,6 +64,18 @@ function shutdownCompareModal() {
   if (compareModalBody) compareModalBody.innerHTML = '';
 }
 
+function returnToCatalog() {
+  showingGlobalFavorites = false;
+  showingFavsOnly = false;
+  if (favFilterBtn) favFilterBtn.classList.remove('active');
+  viewMode = 'catalog';
+  if (playerSearchToggleBtn) playerSearchToggleBtn.classList.remove('active');
+  setCatalogControlsVisible(true);
+  if (compareFloatingBar) compareFloatingBar.style.display = 'none';
+  if (searchInput) searchInput.value = '';
+  loadCategoryData();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   loadCategoryData();
   switchAuthTab('profile');
@@ -273,8 +285,6 @@ function handleRegister(e) {
   if (btnText) btnText.textContent = username;
   
   if (authModal) authModal.style.display = 'none';
-  
-  // Carga automática de sus estadísticas reales
   fetchPlayerData(loggedRiotName, loggedRiotTag, loggedRegion);
 }
 
@@ -295,8 +305,6 @@ function handleLogin(e) {
   if (btnText) btnText.textContent = email.split('@')[0];
   
   if (authModal) authModal.style.display = 'none';
-
-  // Carga automática de sus estadísticas reales
   fetchPlayerData(loggedRiotName, loggedRiotTag, loggedRegion);
 }
 
