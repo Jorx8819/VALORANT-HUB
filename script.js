@@ -8,7 +8,10 @@ let showingFavsOnly = false;
 let showingGlobalFavorites = false;
 let viewMode = 'hub'; 
 let currentCategory = 'agents'; 
-let isLoggedIn = false;
+
+// --- SISTEMA DE CUENTAS Y PERFIL LOCAL ---
+let registeredUsers = JSON.parse(localStorage.getItem('valorant_users')) || [];
+let currentUser = JSON.parse(localStorage.getItem('valorant_current_user')) || null;
 
 const langSelect = document.getElementById('langSelect');
 const searchInput = document.getElementById('searchInput');
@@ -63,6 +66,7 @@ function returnToCatalog() {
 
 document.addEventListener('DOMContentLoaded', () => {
   showMainHub();
+  updateAuthButtonUI();
   
   if (langSelect) langSelect.addEventListener('change', loadCategoryData);
   if (searchInput) searchInput.addEventListener('input', filterAndRender);
@@ -78,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (openAuthModalBtn) {
     openAuthModalBtn.addEventListener('click', () => {
+      switchAuthTab('profile');
       if (authModal) authModal.style.display = 'flex';
     });
   }
@@ -270,22 +275,125 @@ function openDetailModal(uuid) {
   detailModal.style.display = 'flex';
 }
 
-function switchAuthTab(tab) {
+// --- LOGICA DE AUTENTICACIÓN Y PERFIL LOCAL ---
+
+function updateAuthButtonUI() {
+  const btnText = document.getElementById('authButtonText');
+  if (btnText) {
+    if (currentUser) {
+      btnText.textContent = currentUser.username;
+    } else {
+      btnText.textContent = "Mi Cuenta";
+    }
+  }
+}
+
+function switchAuthTab(tab, event) {
+  document.querySelectorAll('.auth-tab-btn').forEach(b => b.classList.remove('active'));
+  if (event && event.target) {
+    event.target.classList.add('active');
+  } else {
+    const buttons = document.querySelectorAll('.auth-tab-btn');
+    buttons.forEach(b => {
+      if ((tab === 'profile' && b.textContent.includes('Perfil')) ||
+          (tab === 'login' && b.textContent.includes('Acceso')) ||
+          (tab === 'register' && b.textContent.includes('Registro'))) {
+        b.classList.add('active');
+      }
+    });
+  }
+
   const container = document.getElementById('authFormContainer');
   if (!container) return;
+
   if (tab === 'profile') {
-    container.innerHTML = `<p style="color:#ccc; text-align:center;">Inicia sesión para guardar tu progreso y gestionar agentes favoritos.</p>`;
+    if (currentUser) {
+      container.innerHTML = `
+        <div style="text-align: center; color: #fff;">
+          <div style="font-size: 40px; margin-bottom: 10px;">👤</div>
+          <h3 style="margin-bottom: 5px; color: var(--accent-red);">${currentUser.username}</h3>
+          <p style="font-size: 12px; color: #888; margin-bottom: 20px;">${currentUser.email}</p>
+          <div style="background: #0f1923; padding: 12px; border-radius: 6px; margin-bottom: 15px; text-align: left;">
+            <p style="font-size: 13px; color: #ccc;"><strong>Favoritos guardados:</strong> ${favorites.length} elementos</p>
+          </div>
+          <button onclick="handleLogout()" class="action-icon-btn" style="width:100%; background: #ff4655; color:#fff; border:none; padding: 10px; border-radius: 4px; cursor:pointer; font-weight: bold;">Cerrar Sesión</button>
+        </div>
+      `;
+    } else {
+      container.innerHTML = `
+        <div style="text-align: center; color: #888; padding: 20px 0;">
+          <p style="margin-bottom: 15px; font-size: 14px;">No has iniciado sesión con ninguna cuenta.</p>
+          <button onclick="switchAuthTab('login')" class="action-icon-btn" style="background: var(--accent-red); color: #fff; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer;">Iniciar Sesión</button>
+        </div>
+      `;
+    }
   } else if (tab === 'login') {
     container.innerHTML = `
-      <input type="email" placeholder="Correo electrónico" class="styled-input">
-      <input type="password" placeholder="Contraseña" class="styled-input">
-      <button class="action-icon-btn" style="width:100%; text-align:center; background:var(--accent-red); color:#fff; border:none; margin-top:10px;">Entrar</button>
+      <form onsubmit="handleLoginSubmit(event)">
+        <input type="email" id="loginEmail" placeholder="Correo electrónico" class="styled-input" required>
+        <input type="password" id="loginPassword" placeholder="Contraseña" class="styled-input" required>
+        <button type="submit" class="action-icon-btn" style="width:100%; text-align:center; background:var(--accent-red); color:#fff; border:none; margin-top:10px; padding: 10px; font-weight: bold; cursor: pointer;">Entrar</button>
+      </form>
     `;
   } else if (tab === 'register') {
     container.innerHTML = `
-      <input type="email" placeholder="Correo electrónico" class="styled-input">
-      <input type="password" placeholder="Contraseña" class="styled-input">
-      <button class="action-icon-btn" style="width:100%; text-align:center; background:var(--accent-red); color:#fff; border:none; margin-top:10px;">Registrarse</button>
+      <form onsubmit="handleRegisterSubmit(event)">
+        <input type="text" id="regUsername" placeholder="Nombre de Agente (Usuario)" class="styled-input" required>
+        <input type="email" id="regEmail" placeholder="Correo electrónico" class="styled-input" required>
+        <input type="password" id="regPassword" placeholder="Contraseña" class="styled-input" required>
+        <button type="submit" class="action-icon-btn" style="width:100%; text-align:center; background:var(--accent-red); color:#fff; border:none; margin-top:10px; padding: 10px; font-weight: bold; cursor: pointer;">Registrarse</button>
+      </form>
     `;
   }
+}
+
+function handleRegisterSubmit(e) {
+  e.preventDefault();
+  const username = document.getElementById('regUsername').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value.trim();
+
+  const existing = registeredUsers.find(u => u.email === email);
+  if (existing) {
+    alert('Este correo electrónico ya está registrado.');
+    return;
+  }
+
+  const newUser = { username, email, password };
+  registeredUsers.push(newUser);
+  localStorage.setItem('valorant_users', JSON.stringify(registeredUsers));
+
+  currentUser = newUser;
+  localStorage.setItem('valorant_current_user', JSON.stringify(currentUser));
+
+  updateAuthButtonUI();
+  alert(`¡Bienvenido agente ${username}! Registro completado con éxito.`);
+  if (authModal) authModal.style.display = 'none';
+}
+
+function handleLoginSubmit(e) {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+
+  const user = registeredUsers.find(u => u.email === email && u.password === password);
+  if (!user) {
+    alert('Correo o contraseña incorrectos.');
+    return;
+  }
+
+  currentUser = user;
+  localStorage.setItem('valorant_current_user', JSON.stringify(currentUser));
+
+  updateAuthButtonUI();
+  alert(`¡Hola de nuevo, ${user.username}! Sesión iniciada.`);
+  if (authModal) authModal.style.display = 'none';
+}
+
+function handleLogout() {
+  currentUser = null;
+  localStorage.removeItem('valorant_current_user');
+  updateAuthButtonUI();
+  switchAuthTab('profile');
+  alert('Has cerrado sesión correctamente.');
 }
