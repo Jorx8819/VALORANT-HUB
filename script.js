@@ -12,8 +12,8 @@ const VALORANT_REGIONS = [
 
 let currentData = [];
 let favorites = JSON.parse(localStorage.getItem('valorant_favs')) || [];
-let compareList = []; // Para armas
-let playerCompareList = []; // NUEVO: Para comparar jugadores [{name, tag, region, data, mmr, matches}]
+let compareList = []; 
+let playerCompareList = []; 
 let showingFavsOnly = false;
 let showingGlobalFavorites = false;
 let viewMode = 'catalog'; 
@@ -215,18 +215,22 @@ function switchAuthTab(tab, event) {
       </div>
     `;
   } else if (tab === 'login') {
-    subtitle.textContent = 'Introduce tus credenciales y tu Riot ID';
+    const savedUser = JSON.parse(localStorage.getItem('valorant_registered_user'));
+    
+    subtitle.textContent = savedUser ? `Inicia sesión como ${savedUser.riotName}#${savedUser.riotTag}` : 'Introduce tus credenciales';
     container.innerHTML = `
       <form onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 10px;">
         <input type="email" id="loginEmail" placeholder="Correo electrónico" required class="styled-input" />
         <input type="password" id="loginPassword" placeholder="Contraseña" required class="styled-input" />
-        <div style="display: flex; gap: 6px; margin-top: 5px;">
-          <input type="text" id="loginRiotName" placeholder="Riot Name (ej. TuNombre)" required class="styled-input" style="flex:2;" />
-          <input type="text" id="loginRiotTag" placeholder="Tag (ej. 1234)" required class="styled-input" style="flex:1;" />
-        </div>
-        <select id="loginRegion" class="styled-select" style="width: 100%;">
-          ${VALORANT_REGIONS.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
-        </select>
+        
+        ${savedUser ? `
+          <div style="background: #111e2e; padding: 10px; border-radius: 6px; font-size: 12px; color: #aaa; text-align: left; border: 1px solid var(--border-color);">
+            Riot ID vinculado: <strong style="color: var(--accent-red);">${savedUser.riotName}#${savedUser.riotTag}</strong> (${savedUser.region.toUpperCase()})
+          </div>
+        ` : `
+          <p style="color: var(--accent-red); font-size: 12px; text-align: center;">No hay ninguna cuenta registrada en este navegador. Por favor, regístrate primero.</p>
+        `}
+
         <button type="submit" class="role-btn active" style="margin-top: 5px; width: 100%; padding: 8px;">Iniciar Sesión</button>
       </form>
     `;
@@ -287,9 +291,21 @@ function handleRegister(e) {
   e.preventDefault();
   const username = document.getElementById('regUsername').value;
   const email = document.getElementById('regEmail').value;
+  const password = document.getElementById('regPassword').value;
   const riotName = document.getElementById('regRiotName').value.trim();
   const riotTag = document.getElementById('regRiotTag').value.trim().replace('#', '');
   const region = document.getElementById('regRegion').value;
+
+  const newUser = {
+    username,
+    email,
+    password,
+    riotName,
+    riotTag,
+    region
+  };
+
+  localStorage.setItem('valorant_registered_user', JSON.stringify(newUser));
 
   isLoggedIn = true;
   loggedUserEmail = email;
@@ -301,24 +317,36 @@ function handleRegister(e) {
   if (btnText) btnText.textContent = username;
   
   if (authModal) authModal.style.display = 'none';
+  alert('¡Cuenta creada y Riot ID vinculado con éxito!');
   fetchPlayerData(loggedRiotName, loggedRiotTag, loggedRegion);
 }
 
 function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('loginEmail').value;
-  const riotName = document.getElementById('loginRiotName').value.trim();
-  const riotTag = document.getElementById('loginRiotTag').value.trim().replace('#', '');
-  const region = document.getElementById('loginRegion').value;
+  const password = document.getElementById('loginPassword').value;
+
+  const savedUser = JSON.parse(localStorage.getItem('valorant_registered_user'));
+
+  if (!savedUser) {
+    alert('No hay ninguna cuenta registrada. Por favor, regístrate primero.');
+    switchAuthTab('register');
+    return;
+  }
+
+  if (savedUser.email !== email) {
+    alert('Correo electrónico incorrecto.');
+    return;
+  }
 
   isLoggedIn = true;
-  loggedUserEmail = email;
-  loggedRiotName = riotName;
-  loggedRiotTag = riotTag;
-  loggedRegion = region;
+  loggedUserEmail = savedUser.email;
+  loggedRiotName = savedUser.riotName;
+  loggedRiotTag = savedUser.riotTag;
+  loggedRegion = savedUser.region || 'eu';
 
   const btnText = document.getElementById('authButtonText');
-  if (btnText) btnText.textContent = email.split('@')[0];
+  if (btnText) btnText.textContent = savedUser.username || email.split('@')[0];
   
   if (authModal) authModal.style.display = 'none';
   fetchPlayerData(loggedRiotName, loggedRiotTag, loggedRegion);
@@ -750,7 +778,6 @@ function renderPlayerSearchForm() {
   `;
 }
 
-// NUEVO: Funciones para comparar jugadores
 function togglePlayerCompare(name, tag, region, playerData, mmrData, matchesData, event) {
   if (event) event.stopPropagation();
   const idKey = `${name}#${tag}`.toLowerCase();
@@ -889,7 +916,6 @@ async function fetchPlayerData(customName, customTag, customRegion) {
     const elo = mmrData?.current_data?.elo ?? 0;
     const rankIcon = mmrData?.current_data?.images?.small || '';
 
-    // NUEVO: Calcular desglose por Agente en base a las últimas partidas
     const agentStats = {};
     matchesData.forEach(m => {
       const me = m.players?.all_players?.find(p => p.puuid === player.puuid || p.name.toLowerCase() === player.name.toLowerCase());
@@ -947,7 +973,6 @@ async function fetchPlayerData(customName, customTag, customRegion) {
           </div>
         </div>
 
-        <!-- NUEVO: Gráfica de Progresión de Rango (Chart.js) -->
         <div style="background: #111e2e; padding: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
           <h3 style="margin-bottom: 15px; color: #fff; font-size: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Progresión de Elo (Últimas Partidas)</h3>
           <div style="position: relative; height: 220px; width: 100%;">
@@ -955,7 +980,6 @@ async function fetchPlayerData(customName, customTag, customRegion) {
           </div>
         </div>
 
-        <!-- NUEVO: Desglose por Agente en el Perfil -->
         <div style="background: #111e2e; padding: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
           <h3 style="margin-bottom: 15px; color: #fff; font-size: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Desglose por Agente (Últimas Partidas)</h3>
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
