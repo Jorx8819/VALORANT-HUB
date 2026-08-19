@@ -18,6 +18,10 @@ let showingGlobalFavorites = false;
 let viewMode = 'catalog'; 
 let isLoggedIn = false;
 let loggedUserEmail = '';
+let loggedRiotName = '';
+let loggedRiotTag = '';
+let loggedRegion = 'eu';
+let searchHistory = JSON.parse(localStorage.getItem('valorant_search_history')) || [];
 
 const categorySelect = document.getElementById('categorySelect');
 const langSelect = document.getElementById('langSelect');
@@ -88,6 +92,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (playerSearchToggleBtn) {
     playerSearchToggleBtn.addEventListener('click', () => {
+      if (!isLoggedIn) {
+        alert('Debes iniciar sesión para acceder al buscador de estadísticas de jugadores.');
+        switchAuthTab('login');
+        if (authModal) authModal.style.display = 'flex';
+        return;
+      }
+
       showingGlobalFavorites = false;
       viewMode = viewMode === 'catalog' ? 'player' : 'catalog';
       playerSearchToggleBtn.classList.toggle('active', viewMode === 'player');
@@ -143,44 +154,71 @@ function switchAuthTab(tab, event) {
   if (activeBtn) activeBtn.classList.add('active');
 
   if (tab === 'profile') {
-    subtitle.textContent = 'Panel de cuenta y elementos guardados';
-    container.innerHTML = `
-      <div style="text-align: center; display: flex; flex-direction: column; gap: 15px;">
-        <div style="background: #111e2e; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
-          <p style="font-size: 13px; color: #888;">Estado de la Sesión</p>
-          <strong style="font-size: 15px; color: ${isLoggedIn ? '#2ecc71' : 'var(--accent-red)'};">
-            ${isLoggedIn ? `Conectado (${loggedUserEmail})` : 'Modo Invitado / Local'}
-          </strong>
+    if (!isLoggedIn) {
+      subtitle.textContent = 'Inicia sesión o regístrate para acceder al tracker';
+      container.innerHTML = `
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+          <button onclick="switchAuthTab('login')" class="role-btn active" style="flex:1;">Iniciar Sesión</button>
+          <button onclick="switchAuthTab('register')" class="role-btn" style="flex:1;">Registrarse</button>
         </div>
-        
-        <div style="background: #111e2e; padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
-          <h4 style="margin-bottom: 8px; color: #fff;">Favoritos Totales en la App</h4>
-          <p style="font-size: 22px; font-weight: bold; color: var(--accent-red);">${favorites.length} <span style="font-size: 12px; color: #aaa;">registrados</span></p>
-          <button onclick="openGlobalFavoritesDashboard()" class="role-btn active" style="margin-top: 12px; width: 100%; padding: 10px;">Ver Todos Mis Favoritos</button>
+        <p style="text-align: center; color: #888; font-size: 13px;">Necesitas una cuenta para rastrear estadísticas de jugadores.</p>
+      `;
+      return;
+    }
+
+    subtitle.textContent = 'Panel de control de tu cuenta';
+    container.innerHTML = `
+      <div style="text-align: center; display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; padding-right: 5px;">
+        <div style="background: #111e2e; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <p style="font-size: 11px; color: #888;">Estado</p>
+          <strong style="font-size: 13px; color: #2ecc71;">Conectado (${loggedUserEmail})</strong>
+          <p style="font-size: 12px; color: var(--accent-red); margin-top: 4px;">Riot ID: ${loggedRiotName}#${loggedRiotTag} (${loggedRegion.toUpperCase()})</p>
         </div>
 
-        ${isLoggedIn ? `
-          <button onclick="handleLogout()" class="level-btn" style="background: var(--accent-red); color: #fff; width: 100%; padding: 8px;">Cerrar Sesión</button>
-        ` : ''}
+        <div style="background: #111e2e; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <button onclick="loadMyOwnStats()" class="role-btn active" style="width: 100%; padding: 8px; font-size: 13px;">Ver Mis Estadísticas de Riot</button>
+        </div>
+        
+        <div style="background: #111e2e; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+          <h4 style="margin-bottom: 6px; color: #fff; font-size: 13px;">Favoritos Totales (${favorites.length})</h4>
+          <button onclick="openGlobalFavoritesDashboard()" class="role-btn" style="width: 100%; padding: 6px; font-size: 12px;">Ver Todos Mis Favoritos</button>
+        </div>
+
+        <div style="background: #111e2e; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); text-align: left;">
+          <h4 style="margin-bottom: 6px; color: #fff; font-size: 13px;">Búsquedas Recientes (${searchHistory.length})</h4>
+          <div style="max-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+            ${searchHistory.length === 0 ? '<p style="font-size: 11px; color: #888;">Sin búsquedas recientes.</p>' : 
+              searchHistory.map(s => `<button onclick="quickSearchPlayer('${s.name}', '${s.tag}', '${s.region}')" style="background: #0f1923; border: none; color: #ccc; font-size: 11px; padding: 4px; text-align: left; cursor: pointer; border-radius: 4px;">${s.name}#${s.tag} (${s.region.toUpperCase()})</button>`).join('')}
+          </div>
+        </div>
+
+        <button onclick="handleLogout()" class="level-btn" style="background: var(--accent-red); color: #fff; width: 100%; padding: 8px; font-size: 13px;">Cerrar Sesión</button>
       </div>
     `;
   } else if (tab === 'login') {
     subtitle.textContent = 'Introduce tus credenciales de acceso';
     container.innerHTML = `
-      <form onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 12px;">
+      <form onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 10px;">
         <input type="email" id="loginEmail" placeholder="Correo electrónico" required class="styled-input" />
         <input type="password" id="loginPassword" placeholder="Contraseña" required class="styled-input" />
-        <button type="submit" class="role-btn active" style="margin-top: 10px; width: 100%; padding: 10px;">Iniciar Sesión</button>
+        <button type="submit" class="role-btn active" style="margin-top: 5px; width: 100%; padding: 8px;">Iniciar Sesión</button>
       </form>
     `;
   } else if (tab === 'register') {
-    subtitle.textContent = 'Crea tu cuenta de acceso';
+    subtitle.textContent = 'Crea tu cuenta y vincula tu Riot ID';
     container.innerHTML = `
-      <form onsubmit="handleRegister(event)" style="display: flex; flex-direction: column; gap: 12px;">
+      <form onsubmit="handleRegister(event)" style="display: flex; flex-direction: column; gap: 10px;">
         <input type="text" id="regUsername" placeholder="Nombre de usuario" required class="styled-input" />
         <input type="email" id="regEmail" placeholder="Correo electrónico" required class="styled-input" />
         <input type="password" id="regPassword" placeholder="Contraseña" required class="styled-input" />
-        <button type="submit" class="role-btn active" style="margin-top: 10px; width: 100%; padding: 10px;">Crear Cuenta</button>
+        <div style="display: flex; gap: 6px;">
+          <input type="text" id="regRiotName" placeholder="Riot Name (ej. Player)" required class="styled-input" style="flex:2;" />
+          <input type="text" id="regRiotTag" placeholder="Tag (ej. 1234)" required class="styled-input" style="flex:1;" />
+        </div>
+        <select id="regRegion" class="styled-select" style="width: 100%;">
+          ${VALORANT_REGIONS.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
+        </select>
+        <button type="submit" class="role-btn active" style="margin-top: 5px; width: 100%; padding: 8px;">Crear Cuenta</button>
       </form>
     `;
   }
@@ -223,11 +261,19 @@ function handleRegister(e) {
   e.preventDefault();
   const email = document.getElementById('regEmail').value;
   const username = document.getElementById('regUsername').value;
+  const riotName = document.getElementById('regRiotName').value.trim();
+  const riotTag = document.getElementById('regRiotTag').value.trim().replace('#', '');
+  const region = document.getElementById('regRegion').value;
+
   isLoggedIn = true;
   loggedUserEmail = email;
+  loggedRiotName = riotName;
+  loggedRiotTag = riotTag;
+  loggedRegion = region;
+
   const btnText = document.getElementById('authButtonText');
   if (btnText) btnText.textContent = username;
-  alert(`¡Cuenta creada con éxito, ${username}!`);
+  alert(`¡Cuenta creada con éxito, ${username}! Riot ID vinculado.`);
   if (authModal) authModal.style.display = 'none';
 }
 
@@ -236,6 +282,11 @@ function handleLogin(e) {
   const email = document.getElementById('loginEmail').value;
   isLoggedIn = true;
   loggedUserEmail = email;
+  // Valores por defecto simulados si inicia sesión de forma rápida
+  loggedRiotName = loggedRiotName || 'Player';
+  loggedRiotTag = loggedRiotTag || '1234';
+  loggedRegion = loggedRegion || 'eu';
+
   const btnText = document.getElementById('authButtonText');
   if (btnText) btnText.textContent = email.split('@')[0];
   alert('¡Bienvenido de nuevo!');
@@ -245,6 +296,8 @@ function handleLogin(e) {
 function handleLogout() {
   isLoggedIn = false;
   loggedUserEmail = '';
+  loggedRiotName = '';
+  loggedRiotTag = '';
   const btnText = document.getElementById('authButtonText');
   if (btnText) btnText.textContent = 'Mi Cuenta';
   switchAuthTab('profile');
@@ -658,29 +711,39 @@ function renderPlayerSearchForm() {
       <input type="text" id="playerGameName" placeholder="Nombre (ej. Mixwell)" class="styled-input" />
       <input type="text" id="playerTagLine" placeholder="Tag (ej. 1234)" class="styled-input" />
       <select id="playerRegion" class="styled-select">
-        ${VALORANT_REGIONS.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
+        ${VALORANT_REGIONS.map(r => `<option value="${r.value}" ${r.value === loggedRegion ? 'selected' : ''}>${r.label}</option>`).join('')}
       </select>
       <button onclick="fetchPlayerData()" class="role-btn active" style="padding: 10px 16px;">Buscar Estadísticas</button>
     </div>
   `;
 }
 
-async function fetchPlayerData() {
+async function fetchPlayerData(customName, customTag, customRegion) {
   const nameInput = document.getElementById('playerGameName');
   const tagInput = document.getElementById('playerTagLine');
   const regionSelect = document.getElementById('playerRegion');
-  if (!nameInput || !tagInput || !contentGrid) return;
-
-  const name = nameInput.value.trim();
-  const tag = tagInput.value.trim().replace('#', '');
-  const region = regionSelect ? regionSelect.value : 'eu';
   
+  const name = customName || (nameInput ? nameInput.value.trim() : '');
+  const tag = (customTag || (tagInput ? tagInput.value.trim() : '')).replace('#', '');
+  const region = customRegion || (regionSelect ? regionSelect.value : loggedRegion);
+
   if (!name || !tag) { 
     alert('Ingresa nombre y tag.'); 
     return; 
   }
 
-  contentGrid.innerHTML = `<div class="player-empty-state" style="grid-column: 1/-1; text-align: center;"><p>Buscando toda la información de <strong>${name}#${tag}</strong>...</p></div>`;
+  // Guardar en historial de búsquedas recientes
+  if (!searchHistory.some(s => s.name.toLowerCase() === name.toLowerCase() && s.tag === tag)) {
+    searchHistory.unshift({ name, tag, region });
+    if (searchHistory.length > 5) searchHistory.pop();
+    localStorage.setItem('valorant_search_history', JSON.stringify(searchHistory));
+  }
+
+  if (viewMode !== 'player' && playerSearchToggleBtn) {
+    playerSearchToggleBtn.click();
+  }
+
+  if (contentGrid) contentGrid.innerHTML = `<div class="player-empty-state" style="grid-column: 1/-1; text-align: center;"><p>Buscando toda la información completa de <strong>${name}#${tag}</strong>...</p></div>`;
   
   try {
     const headers = {};
@@ -688,7 +751,6 @@ async function fetchPlayerData() {
       headers['Authorization'] = HENRIK_API_KEY;
     }
 
-    // Peticiones simultáneas para obtener cuenta, rango (MMR) y últimas partidas
     const accountUrl = `https://api.henrikdev.xyz/valorant/v1/account/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
     const mmrUrl = `https://api.henrikdev.xyz/valorant/v2/mmr/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
     const matchesUrl = `https://api.henrikdev.xyz/valorant/v3/matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
@@ -707,28 +769,23 @@ async function fetchPlayerData() {
     const mmrData = mmrRes && mmrRes.status === 200 ? mmrRes.data : null;
     const matchesData = matchRes && matchRes.status === 200 ? matchRes.data : [];
 
-    // Extraer datos de rango
     const currentTier = mmrData?.current_data?.currenttierpatched || 'Sin rango / No colocado';
     const rankingInTier = mmrData?.current_data?.ranking_in_tier ?? 0;
     const mmrChangeToLastGame = mmrData?.current_data?.mmr_change_to_last_game ?? 0;
     const elo = mmrData?.current_data?.elo ?? 'Oculto';
     const rankIcon = mmrData?.current_data?.images?.small || '';
 
-    // Renderizar perfil completo enriquecido
     contentGrid.innerHTML = `
       <div class="player-profile-container" style="grid-column: 1/-1; display: flex; flex-direction: column; gap: 20px;">
-        
-        <!-- Tarjeta Principal de Identidad -->
         <div class="player-profile-card" style="background: #111e2e; padding: 25px; border-radius: 8px; border: 1px solid var(--accent-red); display: flex; align-items: center; gap: 20px; flex-wrap: wrap; justify-content: center; text-align: center;">
           <img src="${player.card.large || player.card.small}" alt="Player Card" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-red);" />
           <div>
             <h2 style="color: #fff; margin-bottom: 5px; font-size: 24px;">${player.name} <span style="color: #888; font-size: 18px;">#${player.tag}</span></h2>
             <p style="color: var(--accent-red); font-weight: bold; margin-bottom: 5px;">Nivel de Cuenta: ${player.account_level}</p>
-            <p style="color: #aaa; font-size: 13px;">Región: ${player.region.toUpperCase()} | Último cambio de nombre: ${player.last_update || 'N/A'}</p>
+            <p style="color: #aaa; font-size: 13px;">Región: ${player.region.toUpperCase()}</p>
           </div>
         </div>
 
-        <!-- Sección de Rango y Elo Actual -->
         <div style="background: #111e2e; padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap; gap: 15px; text-align: center;">
           ${rankIcon ? `<img src="${rankIcon}" alt="Rank Icon" style="height: 70px;" />` : ''}
           <div>
@@ -749,7 +806,6 @@ async function fetchPlayerData() {
           </div>
         </div>
 
-        <!-- Historial Reciente de Partidas -->
         <div style="background: #111e2e; padding: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
           <h3 style="margin-bottom: 15px; color: #fff; font-size: 18px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Últimas Partidas Registradas</h3>
           <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -771,7 +827,6 @@ async function fetchPlayerData() {
                   <div style="display: flex; justify-content: space-between; align-items: center; background: #0f1923; padding: 12px 15px; border-radius: 6px; border-left: 4px solid ${won ? '#2ecc71' : '#ff4655'}; flex-wrap: wrap; gap: 10px;">
                     <div>
                       <strong style="color: #fff; font-size: 14px;">${mode}</strong> - <span style="color: #aaa; font-size: 13px;">${mapName}</span>
-                      <p style="font-size: 11px; color: #777; margin-top: 2px;">${meta.game_start_patched || ''}</p>
                     </div>
                     <div style="display: flex; gap: 20px; align-items: center; font-size: 13px;">
                       <div>Agente: <strong style="color: #fff;">${me?.character || 'N/A'}</strong></div>
@@ -784,15 +839,30 @@ async function fetchPlayerData() {
             }
           </div>
         </div>
-
       </div>
     `;
 
   } catch (err) {
-    contentGrid.innerHTML = `
-      <div class="player-error-state" style="grid-column: 1/-1; text-align: center; color: var(--accent-red);">
-        <p><strong>Error al consultar la información completa del jugador:</strong> ${err.message}</p>
-      </div>
-    `;
+    if (contentGrid) {
+      contentGrid.innerHTML = `
+        <div class="player-error-state" style="grid-column: 1/-1; text-align: center; color: var(--accent-red);">
+          <p><strong>Error al consultar la información completa:</strong> ${err.message}</p>
+        </div>
+      `;
+    }
   }
+}
+
+function loadMyOwnStats() {
+  if (!isLoggedIn || !loggedRiotName || !loggedRiotTag) {
+    alert('No hay un Riot ID vinculado a tu cuenta.');
+    return;
+  }
+  if (authModal) authModal.style.display = 'none';
+  fetchPlayerData(loggedRiotName, loggedRiotTag, loggedRegion);
+}
+
+function quickSearchPlayer(name, tag, region) {
+  if (authModal) authModal.style.display = 'none';
+  fetchPlayerData(name, tag, region);
 }
