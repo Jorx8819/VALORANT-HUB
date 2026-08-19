@@ -182,7 +182,6 @@ function switchAuthTab(tab, event) {
   }
 }
 
-// Carga global de favoritos recolectando de todas las endpoints de la API
 async function openGlobalFavoritesDashboard() {
   authModal.style.display = 'none';
   showingGlobalFavorites = true;
@@ -199,9 +198,12 @@ async function openGlobalFavoritesDashboard() {
     );
     const results = await Promise.all(promises);
 
-    results.forEach(res => {
+    results.forEach((res, index) => {
+      const catName = categories[index];
       if (res && res.data) {
         const matches = res.data.filter(item => favorites.includes(item.uuid));
+        // Etiquetamos la categoría de origen para que el renderizado de tarjetas sepa tratarla bien
+        matches.forEach(item => { item._inferredCategory = catName; });
         allFavItems.push(...matches);
       }
     });
@@ -258,6 +260,7 @@ async function loadCategoryData() {
     const response = await fetch(endpoint);
     const result = await response.json();
     currentData = result.data || [];
+    currentData.forEach(item => { item._inferredCategory = category; });
 
     renderSubFilters(category);
     filterAndRender();
@@ -292,31 +295,45 @@ function renderCards(data, category) {
     let primaryImg = item.displayIcon || '';
     let hoverImg = item.displayIcon || '';
     let subtitle = '';
+    const activeCategory = item._inferredCategory || category;
 
-    if (category === 'agents') {
+    if (activeCategory === 'agents') {
       primaryImg = item.displayIcon;
       hoverImg = item.fullPortrait || item.fullPortraitV2 || item.displayIcon;
       subtitle = item.role ? item.role.displayName : 'Agente';
-    } else if (category === 'weapons' || category === 'global') {
+    } else if (activeCategory === 'weapons') {
       primaryImg = item.displayIcon;
       hoverImg = item.skins?.[0]?.chromas?.[0]?.fullRender || item.displayIcon;
-      subtitle = item.shopData?.categoryText || item.coordinates || 'Elemento';
-    } else if (category === 'playercards') {
+      subtitle = item.shopData?.categoryText || 'Arma';
+    } else if (activeCategory === 'playercards') {
       primaryImg = item.displayIcon || item.smallArt;
       hoverImg = item.largeArt || item.wideArt;
       subtitle = 'Tarjeta de Jugador';
-    } else if (category === 'maps') {
+    } else if (activeCategory === 'maps') {
       primaryImg = item.listViewIcon || item.splash;
       hoverImg = item.displayIcon || item.splash;
       subtitle = item.coordinates || 'Mapa';
-    } else if (category === 'sprays') {
+    } else if (activeCategory === 'sprays') {
       primaryImg = item.displayIcon;
       hoverImg = item.animationPng || item.animationGif || item.fullTransparentIcon || item.displayIcon;
       subtitle = 'Graffiti';
-    } else if (category === 'buddies') {
+    } else if (activeCategory === 'buddies') {
       primaryImg = item.displayIcon;
       hoverImg = item.levels?.[0]?.displayIcon || item.displayIcon;
       subtitle = 'Llavero';
+    } else {
+      // Fallback genérico inteligente por si viene de favoritos globales sin tipar
+      if (item.role) {
+        subtitle = item.role.displayName || 'Agente';
+        hoverImg = item.fullPortrait || item.displayIcon;
+      } else if (item.weaponStats) {
+        subtitle = 'Arma';
+        hoverImg = item.skins?.[0]?.displayIcon || item.displayIcon;
+      } else if (item.levels) {
+        subtitle = 'Llavero';
+      } else {
+        subtitle = 'Elemento';
+      }
     }
 
     const isFav = favorites.includes(item.uuid);
@@ -332,7 +349,7 @@ function renderCards(data, category) {
         ` : ''}
 
         <div class="card-action-btns">
-          ${category === 'weapons' ? `
+          ${activeCategory === 'weapons' ? `
             <button class="card-btn ${isComparing ? 'is-comparing' : ''}" onclick="toggleCompare('${item.uuid}', event)">⚖</button>
           ` : ''}
           <button class="card-btn ${isFav ? 'is-fav' : ''}" onclick="toggleFavorite('${item.uuid}', event)">♥</button>
@@ -356,15 +373,15 @@ function openDetailModal(uuid) {
   const item = currentData.find(i => i.uuid === uuid);
   if (!item) return;
 
-  const category = categorySelect.value;
+  const activeCategory = item._inferredCategory || categorySelect.value;
   modalBody.innerHTML = '';
 
-  if (category === 'agents') renderAgentDetail(item);
-  else if (category === 'weapons') renderWeaponDetail(item);
-  else if (category === 'maps') renderMapDetail(item);
-  else if (category === 'playercards') renderPlayerCardDetail(item);
-  else if (category === 'sprays') renderSprayDetail(item);
-  else if (category === 'buddies') renderBuddyDetail(item);
+  if (activeCategory === 'agents') renderAgentDetail(item);
+  else if (activeCategory === 'weapons') renderWeaponDetail(item);
+  else if (activeCategory === 'maps') renderMapDetail(item);
+  else if (activeCategory === 'playercards') renderPlayerCardDetail(item);
+  else if (activeCategory === 'sprays') renderSprayDetail(item);
+  else if (activeCategory === 'buddies') renderBuddyDetail(item);
   else {
     if (item.role) renderAgentDetail(item);
     else if (item.weaponStats) renderWeaponDetail(item);
@@ -460,16 +477,49 @@ function renderWeaponDetail(weapon) {
         <p style="color: #888;">${weapon.shopData ? weapon.shopData.categoryText : ''}</p>
       </div>
     </div>
-    ${stats ? `<div class="weapon-stats-box"><div class="stat-item"><h4>Cargador</h4><p>${stats.magazineSize}</p></div><div class="stat-item"><h4>Cadencia</h4><p>${stats.fireRate}/s</p></div><div class="stat-item"><h4>Recarga</h4><p>${stats.reloadTimeSeconds}s</p></div></div>` : ''}
+    ${stats ? `<div class="weapon-stats-box" style="display:flex; gap:15px; margin: 15px 0;"><div class="stat-item"><h4>Cargador</h4><p>${stats.magazineSize}</p></div><div class="stat-item"><h4>Cadencia</h4><p>${stats.fireRate}/s</p></div><div class="stat-item"><h4>Recarga</h4><p>${stats.reloadTimeSeconds}s</p></div></div>` : ''}
+    
+    <div id="skinMediaPreviewContainer" class="skin-media-preview" style="margin: 15px 0; display: none;">
+      <h4 id="selectedSkinTitle" style="margin-bottom: 8px;"></h4>
+      <div id="skinPreviewContent"></div>
+    </div>
+
     <h3 style="margin-top: 20px;">Skins Disponibles</h3>
     <div class="skins-grid">
       ${(weapon.skins || []).map(skin => {
         const icon = skin.displayIcon || skin.chromas?.[0]?.fullRender;
         if (!icon) return '';
-        return `<div class="skin-card"><img src="${icon}"><p style="font-size: 11px; margin-top: 5px;">${skin.displayName}</p></div>`;
+        // Buscamos nivel con vídeo o chroma con render
+        const streamLevel = skin.levels?.find(l => l.streamedVideo) || skin.levels?.[0];
+        const videoUrl = streamLevel ? streamLevel.streamedVideo : '';
+        const renderImg = skin.chromas?.[0]?.fullRender || icon;
+        return `
+          <div class="skin-card" onclick="playSkinMedia('${encodeURIComponent(videoUrl || '')}', '${encodeURIComponent(renderImg)}', '${skin.displayName.replace(/'/g, "\\'")}')">
+            <img src="${icon}" loading="lazy">
+            <p style="font-size: 11px; margin-top: 5px;">${skin.displayName}</p>
+          </div>
+        `;
       }).join('')}
     </div>
   `;
+}
+
+function playSkinMedia(encodedVideoUrl, encodedImgUrl, skinName) {
+  const videoUrl = decodeURIComponent(encodedVideoUrl);
+  const imgUrl = decodeURIComponent(encodedImgUrl);
+  const container = document.getElementById('skinMediaPreviewContainer');
+  const titleEl = document.getElementById('selectedSkinTitle');
+  const contentEl = document.getElementById('skinPreviewContent');
+
+  if (!container || !contentEl) return;
+  container.style.display = 'block';
+  titleEl.textContent = skinName;
+
+  if (videoUrl && videoUrl !== 'null' && videoUrl !== 'undefined') {
+    contentEl.innerHTML = `<video src="${videoUrl}" controls autoplay loop style="max-width: 100%; max-height: 250px; border-radius: 6px;"></video>`;
+  } else {
+    contentEl.innerHTML = `<img src="${imgUrl}" style="max-width: 100%; max-height: 220px; object-fit: contain; border-radius: 6px;" />`;
+  }
 }
 
 function renderGenericDetail(item) {
@@ -533,16 +583,16 @@ function openCompareModalView() {
   const w1 = currentData.find(w => w.uuid === compareList[0]);
   const w2 = currentData.find(w => w.uuid === compareList[1]);
   if (!w1 || !w2) return;
-  compareModalBody.innerHTML = `<h2>Comparación de Armas</h2><div class="compare-grid" style="margin-top: 15px;">${renderCompareColumn(w1)}${renderCompareColumn(w2)}</div>`;
+  compareModalBody.innerHTML = `<h2>Comparación de Armas</h2><div class="compare-grid" style="display: flex; gap: 20px; justify-content: space-around; margin-top: 15px;">${renderCompareColumn(w1)}${renderCompareColumn(w2)}</div>`;
   compareModal.style.display = 'flex';
 }
 
 function renderCompareColumn(weapon) {
   const stats = weapon.weaponStats;
   return `
-    <div class="compare-column">
+    <div class="compare-column" style="text-align: center; flex: 1; background: #111e2e; padding: 15px; border-radius: 8px;">
       <h3>${weapon.displayName}</h3>
-      <img src="${weapon.displayIcon}" style="margin: 10px 0;">
+      <img src="${weapon.displayIcon}" style="max-width: 150px; margin: 10px 0;">
       ${stats ? `<div class="weapon-stats-box"><div class="stat-item"><h4>Cargador</h4><p>${stats.magazineSize}</p></div><div class="stat-item"><h4>Cadencia</h4><p>${stats.fireRate}/s</p></div></div>` : ''}
     </div>
   `;
@@ -558,13 +608,13 @@ function setCatalogControlsVisible(visible) {
 
 function renderPlayerSearchForm() {
   subFilterBar.innerHTML = `
-    <div class="player-search-bar">
-      <input type="text" id="playerGameName" placeholder="Nombre (ej. Mixwell)" />
-      <input type="text" id="playerTagLine" placeholder="Tag (ej. 1234)" />
+    <div class="player-search-bar" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;">
+      <input type="text" id="playerGameName" placeholder="Nombre (ej. Mixwell)" class="styled-input" />
+      <input type="text" id="playerTagLine" placeholder="Tag (ej. 1234)" class="styled-input" />
       <select id="playerRegion" class="styled-select">
         ${VALORANT_REGIONS.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
       </select>
-      <button onclick="fetchPlayerData()">Buscar Estadísticas</button>
+      <button onclick="fetchPlayerData()" class="role-btn active" style="padding: 10px 16px;">Buscar Estadísticas</button>
     </div>
   `;
 }
@@ -577,15 +627,25 @@ async function fetchPlayerData() {
 
   const name = nameInput.value.trim();
   const tag = tagInput.value.trim().replace('#', '');
+  const region = regionSelect ? regionSelect.value : 'eu';
   if (!name || !tag) { alert('Ingresa nombre y tag.'); return; }
 
-  contentGrid.innerHTML = `<div class="player-empty-state"><p>Buscando datos de <strong>${name}#${tag}</strong>...</p></div>`;
+  contentGrid.innerHTML = `<div class="player-empty-state" style="grid-column: 1/-1; text-align: center;"><p>Buscando datos de <strong>${name}#${tag}</strong> en región <strong>${region.toUpperCase()}</strong>...</p></div>`;
+  
   try {
-    const res = await fetch(`${PROXY_BASE}?type=account&name=${encodeURIComponent(name)}&tag=${encodeURIComponent(tag)}`);
+    const res = await fetch(`${PROXY_BASE}?region=${region}&name=${encodeURIComponent(name)}&tag=${encodeURIComponent(tag)}`);
+    
+    // Verificamos si la respuesta del servidor es correcta en formato JSON
+    const contentType = res.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('El servidor proxy no está configurado o devolvió una respuesta HTML (Error 404/500). Asegúrate de disponer de un backend operativo para la ruta /api/player.');
+    }
+
     const data = await res.json();
-    if (!res.ok || !data.data) throw new Error('Jugador no encontrado');
-    contentGrid.innerHTML = `<div class="player-empty-state"><p>¡Jugador encontrado con éxito!</p></div>`;
+    if (!res.ok || !data.data) throw new Error(data.message || 'Jugador no encontrado');
+    
+    contentGrid.innerHTML = `<div class="player-empty-state" style="grid-column: 1/-1; text-align: center;"><p>¡Estadísticas encontradas para ${name}#${tag}!</p></div>`;
   } catch (err) {
-    contentGrid.innerHTML = `<div class="player-error-state"><p>Error: ${err.message}</p></div>`;
+    contentGrid.innerHTML = `<div class="player-error-state" style="grid-column: 1/-1; text-align: center; color: var(--accent-red);"><p><strong>Error:</strong> ${err.message}</p></div>`;
   }
 }
