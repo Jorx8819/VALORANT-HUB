@@ -187,24 +187,31 @@ function switchAuthTab(tab, event) {
       </div>
     `;
   } else if (tab === 'login') {
-    subtitle.textContent = 'Introduce tus credenciales de acceso';
+    subtitle.textContent = 'Introduce tus credenciales y tu Riot ID';
     container.innerHTML = `
       <form onsubmit="handleLogin(event)" style="display: flex; flex-direction: column; gap: 10px;">
         <input type="email" id="loginEmail" placeholder="Correo electrónico" required class="styled-input" />
         <input type="password" id="loginPassword" placeholder="Contraseña" required class="styled-input" />
+        <div style="display: flex; gap: 6px; margin-top: 5px;">
+          <input type="text" id="loginRiotName" placeholder="Riot Name (ej. TuNombre)" required class="styled-input" style="flex:2;" />
+          <input type="text" id="loginRiotTag" placeholder="Tag (ej. 1234)" required class="styled-input" style="flex:1;" />
+        </div>
+        <select id="loginRegion" class="styled-select" style="width: 100%;">
+          ${VALORANT_REGIONS.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
+        </select>
         <button type="submit" class="role-btn active" style="margin-top: 5px; width: 100%; padding: 8px;">Iniciar Sesión</button>
       </form>
     `;
   } else if (tab === 'register') {
-    subtitle.textContent = 'Crea tu cuenta y vincula tu Riot ID';
+    subtitle.textContent = 'Crea tu cuenta y vincula tu Riot ID real';
     container.innerHTML = `
       <form onsubmit="handleRegister(event)" style="display: flex; flex-direction: column; gap: 10px;">
         <input type="text" id="regUsername" placeholder="Nombre de usuario" required class="styled-input" />
         <input type="email" id="regEmail" placeholder="Correo electrónico" required class="styled-input" />
         <input type="password" id="regPassword" placeholder="Contraseña" required class="styled-input" />
         <div style="display: flex; gap: 6px;">
-          <input type="text" id="regRiotName" placeholder="Riot Name (ej. Jorx)" required class="styled-input" style="flex:2;" />
-          <input type="text" id="regRiotTag" placeholder="Tag (ej. 8819)" required class="styled-input" style="flex:1;" />
+          <input type="text" id="regRiotName" placeholder="Riot Name (ej. TuNombre)" required class="styled-input" style="flex:2;" />
+          <input type="text" id="regRiotTag" placeholder="Tag (ej. 1234)" required class="styled-input" style="flex:1;" />
         </div>
         <select id="regRegion" class="styled-select" style="width: 100%;">
           ${VALORANT_REGIONS.map(r => `<option value="${r.value}">${r.label}</option>`).join('')}
@@ -267,27 +274,29 @@ function handleRegister(e) {
   
   if (authModal) authModal.style.display = 'none';
   
-  // Cargar automáticamente sus estadísticas de Riot al registrarse
+  // Carga automática de sus estadísticas reales
   fetchPlayerData(loggedRiotName, loggedRiotTag, loggedRegion);
 }
 
 function handleLogin(e) {
   e.preventDefault();
   const email = document.getElementById('loginEmail').value;
+  const riotName = document.getElementById('loginRiotName').value.trim();
+  const riotTag = document.getElementById('loginRiotTag').value.trim().replace('#', '');
+  const region = document.getElementById('loginRegion').value;
+
   isLoggedIn = true;
   loggedUserEmail = email;
-  
-  // Si no se han definido antes, usamos unos por defecto o los que tuviera guardados
-  loggedRiotName = loggedRiotName || 'Jorx';
-  loggedRiotTag = loggedRiotTag || '8819';
-  loggedRegion = loggedRegion || 'eu';
+  loggedRiotName = riotName;
+  loggedRiotTag = riotTag;
+  loggedRegion = region;
 
   const btnText = document.getElementById('authButtonText');
   if (btnText) btnText.textContent = email.split('@')[0];
   
   if (authModal) authModal.style.display = 'none';
 
-  // Cargar automáticamente sus estadísticas de Riot al iniciar sesión
+  // Carga automática de sus estadísticas reales
   fetchPlayerData(loggedRiotName, loggedRiotTag, loggedRegion);
 }
 
@@ -706,8 +715,8 @@ function renderPlayerSearchForm() {
   if (!subFilterBar) return;
   subFilterBar.innerHTML = `
     <div class="player-search-bar" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;">
-      <input type="text" id="playerGameName" placeholder="Nombre (ej. Jorx)" class="styled-input" />
-      <input type="text" id="playerTagLine" placeholder="Tag (ej. 8819)" class="styled-input" />
+      <input type="text" id="playerGameName" placeholder="Nombre (ej. TuNombre)" class="styled-input" />
+      <input type="text" id="playerTagLine" placeholder="Tag (ej. 1234)" class="styled-input" />
       <select id="playerRegion" class="styled-select">
         ${VALORANT_REGIONS.map(r => `<option value="${r.value}" ${r.value === loggedRegion ? 'selected' : ''}>${r.label}</option>`).join('')}
       </select>
@@ -726,7 +735,7 @@ async function fetchPlayerData(customName, customTag, customRegion) {
   const region = customRegion || (regionSelect ? regionSelect.value : loggedRegion);
 
   if (!name || !tag) { 
-    alert('Ingresa nombre y tag.'); 
+    alert('Ingresa nombre y tag de Valorant.'); 
     return; 
   }
 
@@ -753,7 +762,7 @@ async function fetchPlayerData(customName, customTag, customRegion) {
     ]);
 
     if (!accRes || accRes.status !== 200) {
-      throw new Error(accRes?.message || 'No se pudo encontrar la cuenta del jugador.');
+      throw new Error(accRes?.message || 'No se pudo encontrar la cuenta de Valorant especificada. Verifica el nombre, tag y región.');
     }
 
     const player = accRes.data;
@@ -846,7 +855,7 @@ async function fetchPlayerData(customName, customTag, customRegion) {
 
 function loadMyOwnStats() {
   if (!isLoggedIn || !loggedRiotName || !loggedRiotTag) {
-    alert('No hay un Riot ID vinculado a tu cuenta.');
+    alert('No hay un Riot ID vinculado a tu cuenta. Inicia sesión correctamente.');
     return;
   }
   if (authModal) authModal.style.display = 'none';
