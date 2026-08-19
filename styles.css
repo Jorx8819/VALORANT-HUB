@@ -388,44 +388,59 @@ body {
 .main-hub-container {
   grid-column: 1 / -1;
   width: 100%;
-  max-width: 1100px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 20px;
 }
 
 .hub-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
-  margin-top: 25px;
+  grid-template-columns: repeat(3, 1fr); /* Exactamente 3 columnas */
+  grid-template-rows: repeat(2, auto);    /* Exactamente 2 filas */
+  gap: 25px;
+  margin-top: 30px;
   width: 100%;
 }
 
 .hub-card {
-  background: #111e2e;
-  border: 1px solid var(--border-color, #1f2c39);
-  border-radius: 10px;
-  padding: 25px;
+  background: linear-gradient(135deg, #0f1923 0%, #16222f 100%);
+  /* Efecto de borde con dos colores (Rojo Valorant y Cian/Azulado eléctrico) */
+  border: 2px solid transparent;
+  border-image: linear-gradient(135deg, #ff4655, #00ecec) 1;
+  border-radius: 4px; /* Estilo tecnológico angular característico del juego */
+  padding: 30px 20px;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
 }
 
+/* Brillo y elevación al pasar el ratón */
 .hub-card:hover {
-  transform: translateY(-5px);
-  border-color: var(--accent-red, #ff4655);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+  transform: translateY(-6px);
+  box-shadow: 0 10px 25px rgba(255, 70, 85, 0.3), 0 0 15px rgba(0, 236, 236, 0.2);
+  background: linear-gradient(135deg, #16222f 0%, #1f3044 100%);
 }
 
 .hub-card-inner h3 {
   color: #fff;
-  font-size: 20px;
-  margin-bottom: 8px;
+  font-size: 22px;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .hub-card-inner p {
-  color: #888;
+  color: #8b9bb4;
   font-size: 13px;
   margin: 0;
+}
+
+/* Responsivo para pantallas pequeñas (móviles o tablets estrechas) */
+@media (max-width: 768px) {
+  .hub-grid {
+    grid-template-columns: repeat(1, 1fr);
+  }
 }
