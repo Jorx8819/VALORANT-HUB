@@ -479,22 +479,13 @@ function renderWeaponDetail(weapon) {
     </div>
     ${stats ? `<div class="weapon-stats-box" style="display:flex; gap:15px; margin: 15px 0;"><div class="stat-item"><h4>Cargador</h4><p>${stats.magazineSize}</p></div><div class="stat-item"><h4>Cadencia</h4><p>${stats.fireRate}/s</p></div><div class="stat-item"><h4>Recarga</h4><p>${stats.reloadTimeSeconds}s</p></div></div>` : ''}
     
-    <div id="skinMediaPreviewContainer" class="skin-media-preview" style="margin: 15px 0; display: none;">
-      <h4 id="selectedSkinTitle" style="margin-bottom: 8px;"></h4>
-      <div id="skinPreviewContent"></div>
-    </div>
-
     <h3 style="margin-top: 20px;">Skins Disponibles</h3>
     <div class="skins-grid">
       ${(weapon.skins || []).map(skin => {
         const icon = skin.displayIcon || skin.chromas?.[0]?.fullRender;
         if (!icon) return '';
-        // Buscamos nivel con vídeo o chroma con render
-        const streamLevel = skin.levels?.find(l => l.streamedVideo) || skin.levels?.[0];
-        const videoUrl = streamLevel ? streamLevel.streamedVideo : '';
-        const renderImg = skin.chromas?.[0]?.fullRender || icon;
         return `
-          <div class="skin-card" onclick="playSkinMedia('${encodeURIComponent(videoUrl || '')}', '${encodeURIComponent(renderImg)}', '${skin.displayName.replace(/'/g, "\\'")}')">
+          <div class="skin-card" onclick="openSkinDetailModal('${weapon.uuid}', '${skin.uuid}')">
             <img src="${icon}" loading="lazy">
             <p style="font-size: 11px; margin-top: 5px;">${skin.displayName}</p>
           </div>
@@ -502,6 +493,67 @@ function renderWeaponDetail(weapon) {
       }).join('')}
     </div>
   `;
+}
+
+function openSkinDetailModal(weaponUuid, skinUuid) {
+  const weapon = currentData.find(w => w.uuid === weaponUuid) || currentData.find(i => i.skins?.some(s => s.uuid === skinUuid));
+  if (!weapon) return;
+  const skin = weapon.skins.find(s => s.uuid === skinUuid);
+  if (!skin) return;
+
+  modalBody.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+      <button onclick="openDetailModal('${weapon.uuid}')" class="role-btn" style="padding: 4px 10px; font-size: 12px;">← Volver al arma</button>
+      <h3 style="color: var(--accent-red);">${skin.displayName}</h3>
+    </div>
+
+    <div class="skin-detail-container">
+      <div class="skin-media-preview" id="skinMediaPreviewBox">
+        <img id="activeSkinMedia" src="${skin.displayIcon || skin.chromas?.[0]?.fullRender}" style="max-width: 100%; max-height: 250px; object-fit: contain;" />
+      </div>
+
+      <h4 style="margin-top: 15px; font-size: 14px;">Variantes y Cromas</h4>
+      <div class="skins-grid" style="grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));">
+        ${(skin.chromas || []).map((chroma, index) => {
+          const chromaImg = chroma.fullRender || chroma.displayIcon || skin.displayIcon;
+          const chromaVideo = chroma.streamedVideo;
+          return `
+            <div class="skin-card" onclick="updateSkinPreview('${encodeURIComponent(chromaImg || '')}', '${encodeURIComponent(chromaVideo || '')}')" style="cursor: pointer;">
+              <img src="${chromaImg}" style="height: 45px; object-fit: contain;" loading="lazy">
+              <p style="font-size: 10px; margin-top: 4px;">Croma ${index + 1}</p>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <h4 style="margin-top: 15px; font-size: 14px;">Niveles y Animaciones</h4>
+      <div class="skins-grid" style="grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));">
+        ${(skin.levels || []).map((level, index) => {
+          const levelVideo = level.streamedVideo;
+          const levelIcon = level.displayIcon || skin.displayIcon;
+          return `
+            <div class="skin-card" onclick="updateSkinPreview('${encodeURIComponent(levelIcon || '')}', '${encodeURIComponent(levelVideo || '')}')" style="cursor: pointer;">
+              <p style="font-size: 11px; font-weight: bold; margin-bottom: 4px;">Nivel ${index + 1}</p>
+              <p style="font-size: 10px; color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${level.displayName}</p>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function updateSkinPreview(encodedImg, encodedVideo) {
+  const imgUrl = decodeURIComponent(encodedImg);
+  const videoUrl = decodeURIComponent(encodedVideo);
+  const previewBox = document.getElementById('skinMediaPreviewBox');
+  if (!previewBox) return;
+
+  if (videoUrl && videoUrl !== 'null' && videoUrl !== 'undefined') {
+    previewBox.innerHTML = `<video src="${videoUrl}" controls autoplay loop style="max-width: 100%; max-height: 280px; border-radius: 6px;"></video>`;
+  } else {
+    previewBox.innerHTML = `<img src="${imgUrl}" style="max-width: 100%; max-height: 280px; object-fit: contain;" />`;
+  }
 }
 
 function playSkinMedia(encodedVideoUrl, encodedImgUrl, skinName) {
