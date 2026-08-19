@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Valorant Database & Player Tracker</title>
   <link rel="stylesheet" href="styles.css" />
+  <!-- Incluir Chart.js para gráficos de progresión -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <!-- Header y Navegación Principal -->
@@ -63,8 +65,9 @@
     <div id="contentGrid" class="content-grid"></div>
   </main>
 
+  <!-- Barra flotante dual: Sirve tanto para Armas como para Comparación de Jugadores -->
   <div id="compareFloatingBar" class="compare-floating-bar" style="display: none;">
-    <span id="compareCountText">0/2 armas seleccionadas</span>
+    <span id="compareCountText">0/2 seleccionados</span>
     <button id="openCompareBtn" disabled>Comparar</button>
     <button id="clearCompareBtn" class="secondary">Limpiar</button>
   </div>
