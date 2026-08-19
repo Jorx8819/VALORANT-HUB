@@ -1,4 +1,331 @@
 /* ==========================================================================
+   VALORANT HUB - ESTILOS FINALES CON TAMAÑOS DE TARJETA CONTROLADOS
+   ========================================================================== */
+
+:root {
+  --bg-primary: #0f1923;
+  --bg-secondary: #16222f;
+  --accent-red: #ff4655;
+  --accent-cyan: #00ecec;
+  --text-main: #ffffff;
+  --text-muted: #8b9bb4;
+  --border-color: #2b3a4a;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- HEADER Y CONTROLES --- */
+.top-bar {
+  background-color: #111e2e;
+  padding: 15px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--accent-red);
+  flex-wrap: wrap;
+  gap: 15px;
+  z-index: 10;
+}
+
+.logo-container h1 {
+  font-size: 24px;
+  letter-spacing: 2px;
+  color: var(--text-main);
+}
+
+.logo-container span {
+  color: var(--accent-red);
+}
+
+.controls-container {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.styled-select, .styled-input {
+  background-color: #1a2634;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  border-radius: 4px;
+  outline: none;
+  font-size: 14px;
+}
+
+.styled-select:focus, .styled-input:focus {
+  border-color: var(--accent-cyan);
+}
+
+button {
+  background-color: var(--accent-red);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: #e03e4c;
+}
+
+/* --- CONTENEDOR PRINCIPAL Y SECCIONES DE CATÁLOGO --- */
+.main-content {
+  flex: 1;
+  padding: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+/* --- CONTROL ESTRICTO DE TAMAÑO PARA TARJETAS DE AGENTES, ARMAS, ETC. --- */
+.card, .agent-card, .weapon-card, .spray-card {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  height: 280px; /* Altura fija para que no crezcan de más */
+}
+
+.card:hover, .agent-card:hover, .weapon-card:hover, .spray-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-red);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.5);
+}
+
+/* Forzar que las imágenes dentro de las tarjetas encajen perfectamente sin volverse gigantes */
+.card img, .agent-card img, .weapon-card img, .spray-card img, 
+.card-img-container, .spray-img-container {
+  width: 100%;
+  height: 200px; /* Altura controlada para el área de imagen */
+  object-fit: contain; /* Evita que la imagen se deforme o expanda */
+  background: rgba(0, 0, 0, 0.15);
+}
+
+
+/* ==========================================================================
+   DISEÑO EXCLUSIVO PARA EL MAIN HUB (PANTALLA DE INICIO)
+   ========================================================================== */
+
+.main-hub-container {
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 10px;
+}
+
+.hub-header-title {
+  text-align: center;
+  margin-bottom: 35px;
+}
+
+.hub-header-title h1 {
+  color: var(--text-main);
+  font-size: 32px;
+  letter-spacing: 3px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  text-shadow: 0 0 15px rgba(255, 70, 85, 0.4);
+}
+
+.hub-header-title p {
+  color: var(--text-muted);
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+  width: 100%;
+}
+
+.hub-card {
+  position: relative;
+  height: 190px;
+  background: linear-gradient(135deg, #131f2b 0%, #1a2634 100%);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.hub-card-bg {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-image: radial-gradient(rgba(0, 236, 236, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.hub-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 0%; height: 3px;
+  background: var(--accent-red);
+  box-shadow: 0 0 10px var(--accent-red);
+  transition: width 0.3s ease;
+  z-index: 3;
+}
+
+.hub-card::after {
+  content: "";
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 12px; height: 12px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+  border-right: 2px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+  z-index: 3;
+}
+
+.hub-card-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hub-badge {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  background: rgba(0, 236, 236, 0.1);
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+
+.hub-card-content h3 {
+  color: var(--text-main);
+  font-size: 24px;
+  margin-bottom: 6px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  transition: color 0.3s ease;
+}
+
+.hub-card-content p {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin: 0;
+  max-width: 220px;
+}
+
+.hub-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 70, 85, 0.6);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8), inset 0 0 20px rgba(255, 70, 85, 0.08);
+  background: linear-gradient(135deg, #182635 0%, #223347 100%);
+}
+
+.hub-card:hover::before {
+  width: 100%;
+}
+
+.hub-card:hover::after {
+  border-color: var(--accent-red);
+  box-shadow: 2px 2px 8px rgba(255, 70, 85, 0.5);
+}
+
+.hub-card:hover h3 {
+  color: var(--accent-red);
+}
+
+
+/* --- MODALES Y POPUPS --- */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.modal-content {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 25px;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+}
+
+.close-btn {
+  position: absolute;
+  top: 15px; right: 20px;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.close-btn:hover {
+  color: var(--text-main);
+}
+
+/* --- RESPONSIVO --- */
+@media (max-width: 900px) {
+  .hub-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .hub-grid {
+    grid-template-columns: 1fr;
+  }
+}/* ==========================================================================
    VALORANT HUB - ESTILOS COMPLETOS (ORIGINAL RESTAURADO + HUB HUD CORREGIDO)
    ========================================================================== */
 
